@@ -8,6 +8,7 @@ from app.stores import redis_writer
 from app.stores.influx_writer import diag_point, telemetry_point
 from app.stores.influx_writer import writer as influx_writer
 from app.stores.postgres import get_engine
+from app.ws import hub as ws_hub
 
 log = logging.getLogger("signalbridge.persist")
 
@@ -15,11 +16,14 @@ counters: dict[str, int] = {"pg_errors": 0, "status_events": 0, "pg_skipped_unre
 
 
 async def persist_message(msg: NormalizedMessage) -> None:
+    # M5: sau khi ghi stores thì phát lên WS hub (§4.2) — telemetry có throttle, còn lại gửi ngay
     if isinstance(msg, Telemetry):
         influx_writer.enqueue(telemetry_point(msg))
         await _safe(redis_writer.write_telemetry(msg), "redis telemetry")
+        await ws_hub.submit_telemetry(msg)  # throttle latest-wins bên trong hub
     elif isinstance(msg, Diag):
         influx_writer.enqueue(diag_point(msg))
+        await ws_hub.broadcast_message(msg)
     elif isinstance(msg, Status):
         try:
             changed = await redis_writer.write_status(msg)
@@ -30,10 +34,13 @@ async def persist_message(msg: NormalizedMessage) -> None:
             await _record_status_event(msg)
         else:
             log.debug("status unchanged for %s (retain replay/periodic) — no event", msg.gateway_id)
+        await ws_hub.broadcast_message(msg)
     elif isinstance(msg, GatewayInfo):
         await _upsert_gateway_info(msg)
+        await ws_hub.broadcast_message(msg)  # §4.3: gửi sau upsert để client cập nhật slave list
     elif isinstance(msg, GatewayEvent):
         await _insert_events(msg)
+        await ws_hub.broadcast_message(msg)
 
 
 async def _safe(coro, label: str) -> None:

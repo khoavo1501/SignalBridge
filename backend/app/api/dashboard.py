@@ -36,8 +36,7 @@ def _metric_entries(latest: dict | None, defs: list[dict]) -> list[dict]:
     return out
 
 
-@router.get("/dashboard/summary")
-async def dashboard_summary() -> dict:
+async def build_summary() -> dict:
     s = get_settings()
     now = datetime.now(UTC).timestamp()
     gateways = await postgres.fetch_gateways(include_disabled=False)
@@ -77,3 +76,8 @@ async def dashboard_summary() -> dict:
         "stale_threshold_s": s.stale_threshold_s,
         "gateways": items,
     }
+
+
+@router.get("/dashboard/summary")
+async def dashboard_summary() -> dict:
+    return await build_summary()

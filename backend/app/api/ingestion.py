@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.ingestion import persist, pipeline
 from app.stores import redis_writer
 from app.stores.influx_writer import writer as influx_writer
+from app.ws import hub
 
 router = APIRouter(prefix="/api/v1", tags=["ingestion"])
 
@@ -14,4 +15,6 @@ async def ingestion_stats() -> dict:
         **influx_writer.counters,
         **redis_writer.counters,
         **persist.counters,
+        "ws_clients": hub.client_hub.client_count(),
+        **hub.client_hub.counters,
     }

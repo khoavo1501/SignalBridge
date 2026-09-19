@@ -6,12 +6,12 @@
 
 - **Dự án:** SignalBridge — giám sát PLC realtime
 - **Plan:** `PROJECT_PLAN.md` v1.3 (2026-09-19)
-- **Cập nhật gần nhất:** 2026-09-19 — M4 hoàn thành (REST API đọc dữ liệu + badge 3 trạng thái, xem [M4-rest-api.md](M4-rest-api.md))
+- **Cập nhật gần nhất:** 2026-09-19 — M5 hoàn thành (WebSocket realtime + throttle latest-wins, xem [M5-websocket-realtime.md](M5-websocket-realtime.md))
 
 ## Trạng thái tổng thể
 
-**Phase hiện tại:** M4 hoàn thành — tiếp theo M5 (WebSocket realtime).
-**Tổng tiến độ:** 5/9 milestone.
+**Phase hiện tại:** M5 hoàn thành — tiếp theo M6 (frontend dashboard tổng quan).
+**Tổng tiến độ:** 6/9 milestone.
 
 | Milestone | Phạm vi chức năng | Trạng thái | Báo cáo chi tiết |
 |---|---|---|---|
@@ -20,7 +20,7 @@
 | M2 | Kết nối MQTT & xác nhận payload | ✅ Done (2026-09-19) | [M2-mqtt-ingestion.md](M2-mqtt-ingestion.md) |
 | M3 | Persist Influx/Postgres/Redis | ✅ Done (2026-09-19) | [M3-persistence.md](M3-persistence.md) |
 | M4 | REST API đọc dữ liệu | ✅ Done (2026-09-19) | [M4-rest-api.md](M4-rest-api.md) |
-| M5 | WebSocket realtime | ⚪ Pending | — |
+| M5 | WebSocket realtime | ✅ Done (2026-09-19) | [M5-websocket-realtime.md](M5-websocket-realtime.md) |
 | M6 | Frontend dashboard tổng quan | ⚪ Pending | — |
 | M7 | Frontend chi tiết gateway/slave | ⚪ Pending | — |
 | M8 | Admin UI đăng ký & quản lý gateway (Q8) | ⚪ Pending | — |
@@ -40,6 +40,7 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | **Q6:** demo giữ ngưỡng stale 10 s (env `STALE_THRESHOLD_S`), điều chỉnh sau nếu cần | PROJECT_PLAN.md §3.3 |
 | 2026-09-19 | **Q8:** đăng ký gateway mới qua **UI admin** → thêm gateway CRUD (`POST/PATCH/DELETE /api/v1/gateways`) + milestone **M8** | PROJECT_PLAN.md §4.1, §7 |
 | 2026-09-19 | Timestamp chuẩn = server receive time, bỏ `ts` payload (luôn = 0) | ràng buộc #1 |
+| 2026-09-19 | **WS telemetry throttle = aggregate latest-wins + trailing flush đúng boundary** (không phải gate-drop — gate-drop bị quantize theo input: 100 ms input + 250 ms gate → 300 ms thực tế, fail DoD ±10%) | M5 report §4, PROJECT_PLAN §4.2 |
 | 2026-09-19 | Parser theo adapter pattern; payload gateway loại mới phải lưu vào `docs/payloads/` trước khi viết adapter | PROJECT_PLAN.md §2, §6 |
 
 ## Câu hỏi mở còn lại
@@ -66,3 +67,4 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | **M2 ✅** — parser adapter `s7200_v1` + registry, aiomqtt listener có backoff, `gateway_simulator` phát lại đủ 5 payload, E2E 206/206 msg khớp ground truth (8 DI + di_word + ai_raw, vắng hc0/c0 đúng firmware), LWT offline ~3 s. 18 unit test |
 | 2026-09-19 | **M3 ✅** — influx_writer batch 1 s (telemetry+diag, sparse, server-time), redis writer 3 key §3.3, pg writer (info upsert, events, STATUS dedupe qua Redis). DoD đủ 5 mục trên stack thật: 10 điểm/s steady ±0%, kill -9 backend → retain replay 0 event trùng, mỗi kill/restart đúng 2 dòng STATUS. Bug sửa: `Point.add_field`→`field`; `:raw::jsonb`→`CAST(:raw AS jsonb)`. 28 unit test |
 | 2026-09-19 | **M4 ✅** — 7 endpoint đọc (§4.1) + error contract + badge 3 trạng thái. DoD live: stale khi telemetry dừng (MQTT vẫn online), offline < 5 s sau LWT, health 503 khi redis chết, coverage API 98%, 49 test. Bug: Influx 2.7 không có `typeof()` → agg tách 2 flux numeric/DI merge Python; sửa M3 sót meta info (fw/hw/ip/mac) trong upsert. POST/DELETE gateways hoãn sang M8 |
+| 2026-09-19 | **M5 ✅** — WS hub + subscribe §4.2, snapshot 5 ms, đủ 5 kind frame (info sau upsert, diag/event ngay), heartbeat uvicorn ping 30 s, Broadcaster Local/RedisPubSub (env `WS_PUBSUB_ENABLED`), stats `ws_clients/published/dropped`. DoD live: 41 frame/10 s nhịp đúng 250 ms (+2,5%), status offline tới client 3,0 s sau kill -9, reconnect sau restart backend, CPU không tăng quá noise. **Quyết định kỹ thuật: throttle = latest-wins + trailing flush boundary** (gate-drop thuần bị quantize theo input 100 ms → 300 ms, fail ±10%). 69 test |

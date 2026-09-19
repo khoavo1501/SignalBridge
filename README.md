@@ -83,3 +83,7 @@ PATCH /gateways/{id}                    # display_name | adapter_key | enabled
 ```
 
 Lỗi trả `{"error": {"code": "...", "message": "..."}}` (404 gateway_not_found / slave_not_found, 400 range_too_large, 503 store_unavailable).
+
+## WebSocket realtime (M5)
+
+`ws://localhost/ws` (qua Nginx). Client gửi `{"type":"subscribe","gateways":["GW_S7200_01"]}` — thiếu `gateways` = nhận hết. Server trả envelope `{"type","ts","data"}` với kind: `snapshot` (frame đầu khi connect — summary §4.1), `telemetry` (throttle latest-wins `WS_TELEMETRY_MIN_INTERVAL_MS=250`), `status`/`event`/`info`/`diag` (gửi ngay). Heartbeat: uvicorn protocol ping 30 s. Nhiều instance backend: bật `WS_PUBSUB_ENABLED=true` (fan-out Redis Pub/Sub kênh `sb:ws`). Đo nhanh: `cd backend && python tests/e2e_ws.py rate|wait|hold --url ws://localhost:8000/ws` (cần `pip install websockets`).
