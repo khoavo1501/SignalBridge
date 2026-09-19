@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     stale_threshold_s: int = 10
     ws_telemetry_min_interval_ms: int = 250
     auth_enabled: bool = False
+    ingest_enabled: bool = True
 
 
 @lru_cache

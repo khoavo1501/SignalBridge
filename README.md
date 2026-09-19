@@ -42,7 +42,18 @@ npm run dev                              # http://localhost:5173
 ```
 backend/            FastAPI: parsers/ ingestion/ stores/ api/ ws/
 frontend/           React + TS + Vite (Recharts, lucide-react)
-gateway_simulator/  Giả lập GW_S7200_01 publish MQTT (implement ở M2)
+gateway_simulator/  Giả lập GW_S7200_01 publish MQTT
 deploy/             nginx compose-level (M1)
 docs/               payloads/ (ground truth) + reports/ (tiến trình)
+```
+
+## Gateway simulator (dev/test M2+)
+
+```bash
+cd backend && source .venv/bin/activate && pip install -r ../gateway_simulator/requirements.txt
+python ../gateway_simulator/simulator.py --host 192.168.1.3 --duration 60 --diag-interval-s 5
+# --with-hr54   : giả lập firmware đã mở region 54–58 (hr_54/hr_58 xuất hiện)
+# --fail-rate X : phát event SLAVE_COMM_LOST (rate-limit 30 s như firmware)
+# kill -9       : test LWT offline (~3 s với --keepalive 2 mặc định)
+# Theo dõi: docker compose logs -f backend | grep NORMALIZED
 ```

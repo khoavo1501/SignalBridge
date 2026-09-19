@@ -6,18 +6,18 @@
 
 - **Dự án:** SignalBridge — giám sát PLC realtime
 - **Plan:** `PROJECT_PLAN.md` v1.3 (2026-09-19)
-- **Cập nhật gần nhất:** 2026-09-19 — M1 hoàn thành (compose + schema + seed + health, xem [M1-docker-infra.md](M1-docker-infra.md))
+- **Cập nhật gần nhất:** 2026-09-19 — M2 hoàn thành (parser s7200_v1 + ingestion + simulator, xem [M2-mqtt-ingestion.md](M2-mqtt-ingestion.md))
 
 ## Trạng thái tổng thể
 
-**Phase hiện tại:** M1 hoàn thành — tiếp theo M2 (MQTT ingestion + parser).
-**Tổng tiến độ:** 2/9 milestone.
+**Phase hiện tại:** M2 hoàn thành — tiếp theo M3 (persist 3 kho).
+**Tổng tiến độ:** 3/9 milestone.
 
 | Milestone | Phạm vi chức năng | Trạng thái | Báo cáo chi tiết |
 |---|---|---|---|
 | M0 | Scaffolding repo & tài liệu nền tảng | ✅ Done (2026-09-19) | [M0-scaffolding.md](M0-scaffolding.md) |
 | M1 | Hạ tầng Docker (7 service) | ✅ Done (2026-09-19) | [M1-docker-infra.md](M1-docker-infra.md) |
-| M2 | Kết nối MQTT & xác nhận payload | ⚪ Pending | — |
+| M2 | Kết nối MQTT & xác nhận payload | ✅ Done (2026-09-19) | [M2-mqtt-ingestion.md](M2-mqtt-ingestion.md) |
 | M3 | Persist Influx/Postgres/Redis | ⚪ Pending | — |
 | M4 | REST API đọc dữ liệu | ⚪ Pending | — |
 | M5 | WebSocket realtime | ⚪ Pending | — |

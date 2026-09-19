@@ -1,0 +1,2 @@
+# MQTT client cho gateway simulator (paho — mô phỏng hành vi firmware: QoS/retain/LWT)
+paho-mqtt==2.1.0
