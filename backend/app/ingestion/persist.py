@@ -56,12 +56,25 @@ async def _upsert_gateway_info(msg: GatewayInfo) -> None:
         async with get_engine().begin() as conn:
             gw = await conn.execute(
                 sa.text("""
-                    INSERT INTO gateways (gateway_id, display_name, adapter_key)
-                    VALUES (:gid, :gid, :key)
-                    ON CONFLICT (gateway_id) DO UPDATE SET updated_at = now()
+                    INSERT INTO gateways
+                        (gateway_id, display_name, adapter_key, fw_version, hw_version, ip, mac)
+                    VALUES (:gid, :gid, :key, :fw, :hw, :ip, :mac)
+                    ON CONFLICT (gateway_id) DO UPDATE SET
+                        updated_at = now(),
+                        fw_version = COALESCE(EXCLUDED.fw_version, gateways.fw_version),
+                        hw_version = COALESCE(EXCLUDED.hw_version, gateways.hw_version),
+                        ip = COALESCE(EXCLUDED.ip, gateways.ip),
+                        mac = COALESCE(EXCLUDED.mac, gateways.mac)
                     RETURNING id
                     """),
-                {"gid": msg.gateway_id, "key": msg.adapter_key},
+                {
+                    "gid": msg.gateway_id,
+                    "key": msg.adapter_key,
+                    "fw": msg.fw_version,
+                    "hw": msg.hw_version,
+                    "ip": msg.ip,
+                    "mac": msg.mac,
+                },
             )
             gw_pk = gw.scalar_one()
             for slave in msg.slaves:

@@ -6,12 +6,12 @@
 
 - **Dự án:** SignalBridge — giám sát PLC realtime
 - **Plan:** `PROJECT_PLAN.md` v1.3 (2026-09-19)
-- **Cập nhật gần nhất:** 2026-09-19 — M3 hoàn thành (persist Influx/Postgres/Redis + writer tests, xem [M3-persistence.md](M3-persistence.md))
+- **Cập nhật gần nhất:** 2026-09-19 — M4 hoàn thành (REST API đọc dữ liệu + badge 3 trạng thái, xem [M4-rest-api.md](M4-rest-api.md))
 
 ## Trạng thái tổng thể
 
-**Phase hiện tại:** M3 hoàn thành — tiếp theo M4 (REST API đọc dữ liệu).
-**Tổng tiến độ:** 4/9 milestone.
+**Phase hiện tại:** M4 hoàn thành — tiếp theo M5 (WebSocket realtime).
+**Tổng tiến độ:** 5/9 milestone.
 
 | Milestone | Phạm vi chức năng | Trạng thái | Báo cáo chi tiết |
 |---|---|---|---|
@@ -19,7 +19,7 @@
 | M1 | Hạ tầng Docker (7 service) | ✅ Done (2026-09-19) | [M1-docker-infra.md](M1-docker-infra.md) |
 | M2 | Kết nối MQTT & xác nhận payload | ✅ Done (2026-09-19) | [M2-mqtt-ingestion.md](M2-mqtt-ingestion.md) |
 | M3 | Persist Influx/Postgres/Redis | ✅ Done (2026-09-19) | [M3-persistence.md](M3-persistence.md) |
-| M4 | REST API đọc dữ liệu | ⚪ Pending | — |
+| M4 | REST API đọc dữ liệu | ✅ Done (2026-09-19) | [M4-rest-api.md](M4-rest-api.md) |
 | M5 | WebSocket realtime | ⚪ Pending | — |
 | M6 | Frontend dashboard tổng quan | ⚪ Pending | — |
 | M7 | Frontend chi tiết gateway/slave | ⚪ Pending | — |
@@ -65,3 +65,4 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | **M1 ✅** — compose 7 service healthy, `/api/v1/health` ok (pg+influx+redis+mqtt), schema baseline + seed chạy qua container, MQTT roundtrip verified. **Bàn giao Q1: broker EMQX = `192.168.1.3:1883` cho firmware.** Bug sửa trong milestone: flatten `COPY alembic` trong Dockerfile; `sa_async.text` sai module. Injection tiếp tục xuất hiện — vẫn bị từ chối toàn bộ |
 | 2026-09-19 | **M2 ✅** — parser adapter `s7200_v1` + registry, aiomqtt listener có backoff, `gateway_simulator` phát lại đủ 5 payload, E2E 206/206 msg khớp ground truth (8 DI + di_word + ai_raw, vắng hc0/c0 đúng firmware), LWT offline ~3 s. 18 unit test |
 | 2026-09-19 | **M3 ✅** — influx_writer batch 1 s (telemetry+diag, sparse, server-time), redis writer 3 key §3.3, pg writer (info upsert, events, STATUS dedupe qua Redis). DoD đủ 5 mục trên stack thật: 10 điểm/s steady ±0%, kill -9 backend → retain replay 0 event trùng, mỗi kill/restart đúng 2 dòng STATUS. Bug sửa: `Point.add_field`→`field`; `:raw::jsonb`→`CAST(:raw AS jsonb)`. 28 unit test |
+| 2026-09-19 | **M4 ✅** — 7 endpoint đọc (§4.1) + error contract + badge 3 trạng thái. DoD live: stale khi telemetry dừng (MQTT vẫn online), offline < 5 s sau LWT, health 503 khi redis chết, coverage API 98%, 49 test. Bug: Influx 2.7 không có `typeof()` → agg tách 2 flux numeric/DI merge Python; sửa M3 sót meta info (fw/hw/ip/mac) trong upsert. POST/DELETE gateways hoãn sang M8 |

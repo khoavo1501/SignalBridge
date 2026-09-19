@@ -25,3 +25,6 @@ dist/
 
 # data (dev local)
 deploy/local-data/
+coverage
+.coverage
+htmlcov/

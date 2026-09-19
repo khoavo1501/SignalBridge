@@ -232,8 +232,16 @@ async def test_upsert_info_slaves_idempotent(monkeypatch):
     await persist._upsert_gateway_info(info)
     assert len(calls) == 2
     upsert_sql, params = calls[0]
-    assert "ON CONFLICT (gateway_id) DO UPDATE SET updated_at = now()" in upsert_sql
-    assert params == {"gid": "GW_S7200_01", "key": "s7200_v1"}
+    assert "ON CONFLICT (gateway_id) DO UPDATE SET" in upsert_sql
+    assert "fw_version = COALESCE(EXCLUDED.fw_version" in upsert_sql
+    assert params == {
+        "gid": "GW_S7200_01",
+        "key": "s7200_v1",
+        "fw": "1.1.0",
+        "hw": None,
+        "ip": None,
+        "mac": None,
+    }
     slave_sql, slave_params = calls[1]
     assert "INSERT INTO slaves" in slave_sql
     assert slave_params == {"gw": 42, "addr": 1, "name": "S7-200"}

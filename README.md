@@ -69,3 +69,17 @@ Pipeline `mqtt → parser → persist` ghi 3 kho; mọi timestamp là **server r
 | Postgres | `gateways`/`slaves` (upsert từ `info`), `gateway_events` (event + STATUS_ONLINE/OFFLINE chỉ khi đổi trạng thái) | `docker compose exec postgres psql -U sb -d signalbridge -c "SELECT * FROM gateway_events ORDER BY id DESC LIMIT 10"` |
 
 Counter lỗi ghi + số điểm đã flush: `curl localhost/api/v1/ingestion/stats`.
+
+## REST API (M4)
+
+Tất cả qua Nginx tại `http://localhost/api/v1` (khái quát: `PROJECT_PLAN.md` §4.1):
+
+```
+GET  /dashboard/summary                 # badge online/stale/offline + primary metrics (raw, scaled=false)
+GET  /gateways                          # danh sách + meta (fw/ip/mac từ info) + slaves
+GET  /gateways/{id}[/latest|/history|/events|/diag]
+     ?signals=ai_raw,hc0&agg=10s&from=...&to=...   # history: window ≤ 7 ngày, agg raw|duration
+PATCH /gateways/{id}                    # display_name | adapter_key | enabled
+```
+
+Lỗi trả `{"error": {"code": "...", "message": "..."}}` (404 gateway_not_found / slave_not_found, 400 range_too_large, 503 store_unavailable).
