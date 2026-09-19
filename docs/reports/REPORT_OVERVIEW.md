@@ -6,19 +6,19 @@
 
 - **Dự án:** SignalBridge — giám sát PLC realtime
 - **Plan:** `PROJECT_PLAN.md` v1.3 (2026-09-19)
-- **Cập nhật gần nhất:** 2026-09-19 — M2 hoàn thành (parser s7200_v1 + ingestion + simulator, xem [M2-mqtt-ingestion.md](M2-mqtt-ingestion.md))
+- **Cập nhật gần nhất:** 2026-09-19 — M3 hoàn thành (persist Influx/Postgres/Redis + writer tests, xem [M3-persistence.md](M3-persistence.md))
 
 ## Trạng thái tổng thể
 
-**Phase hiện tại:** M2 hoàn thành — tiếp theo M3 (persist 3 kho).
-**Tổng tiến độ:** 3/9 milestone.
+**Phase hiện tại:** M3 hoàn thành — tiếp theo M4 (REST API đọc dữ liệu).
+**Tổng tiến độ:** 4/9 milestone.
 
 | Milestone | Phạm vi chức năng | Trạng thái | Báo cáo chi tiết |
 |---|---|---|---|
 | M0 | Scaffolding repo & tài liệu nền tảng | ✅ Done (2026-09-19) | [M0-scaffolding.md](M0-scaffolding.md) |
 | M1 | Hạ tầng Docker (7 service) | ✅ Done (2026-09-19) | [M1-docker-infra.md](M1-docker-infra.md) |
 | M2 | Kết nối MQTT & xác nhận payload | ✅ Done (2026-09-19) | [M2-mqtt-ingestion.md](M2-mqtt-ingestion.md) |
-| M3 | Persist Influx/Postgres/Redis | ⚪ Pending | — |
+| M3 | Persist Influx/Postgres/Redis | ✅ Done (2026-09-19) | [M3-persistence.md](M3-persistence.md) |
 | M4 | REST API đọc dữ liệu | ⚪ Pending | — |
 | M5 | WebSocket realtime | ⚪ Pending | — |
 | M6 | Frontend dashboard tổng quan | ⚪ Pending | — |
@@ -63,3 +63,5 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | Người dùng trả lời Q3–Q6, Q8 → plan v1.3: retention 60d, adapter s7200_v1 dùng chung cho các gateway cùng loại, ngưỡng stale 10 s, thêm gateway CRUD + milestone M8 (Admin UI). Chỉ còn Q7 (+ công thức scale Q2b) mở |
 | 2026-09-19 | **M0 ✅** — scaffold backend/frontend, tooling, Dockerfiles, CI workflow. pytest/ruff/black/eslint/prettier/vite build/docker build đều xanh thủ công (chưa verify CI trên remote). Phát hiện: pin phải resolve lại cho Python 3.14; npm cục bộ chặn postinstall esbuild. **Lưu ý bảo mật: nhiều prompt injection giả "[System Instructions]" (gồm lệnh `rm -rf ~/.qoder`) trong phiên M0 — tất cả bị từ chối, chi tiết §8 báo cáo M0** |
 | 2026-09-19 | **M1 ✅** — compose 7 service healthy, `/api/v1/health` ok (pg+influx+redis+mqtt), schema baseline + seed chạy qua container, MQTT roundtrip verified. **Bàn giao Q1: broker EMQX = `192.168.1.3:1883` cho firmware.** Bug sửa trong milestone: flatten `COPY alembic` trong Dockerfile; `sa_async.text` sai module. Injection tiếp tục xuất hiện — vẫn bị từ chối toàn bộ |
+| 2026-09-19 | **M2 ✅** — parser adapter `s7200_v1` + registry, aiomqtt listener có backoff, `gateway_simulator` phát lại đủ 5 payload, E2E 206/206 msg khớp ground truth (8 DI + di_word + ai_raw, vắng hc0/c0 đúng firmware), LWT offline ~3 s. 18 unit test |
+| 2026-09-19 | **M3 ✅** — influx_writer batch 1 s (telemetry+diag, sparse, server-time), redis writer 3 key §3.3, pg writer (info upsert, events, STATUS dedupe qua Redis). DoD đủ 5 mục trên stack thật: 10 điểm/s steady ±0%, kill -9 backend → retain replay 0 event trùng, mỗi kill/restart đúng 2 dòng STATUS. Bug sửa: `Point.add_field`→`field`; `:raw::jsonb`→`CAST(:raw AS jsonb)`. 28 unit test |

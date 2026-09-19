@@ -8,12 +8,14 @@ from app.api.ingestion import router as ingestion_router
 from app.config import get_settings
 from app.ingestion.mqtt_client import run_ingestion
 from app.logging_config import setup_logging
+from app.stores.influx_writer import writer as influx_writer
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     task = None
     if get_settings().ingest_enabled:
+        influx_writer.start()
         task = asyncio.create_task(run_ingestion())
     yield
     if task is not None:
@@ -22,6 +24,7 @@ async def lifespan(app: FastAPI):
             await task
         except asyncio.CancelledError:
             pass
+        await influx_writer.stop()  # flush điểm cuối trước khi tắt
 
 
 def create_app() -> FastAPI:

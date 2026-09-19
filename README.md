@@ -57,3 +57,15 @@ python ../gateway_simulator/simulator.py --host 192.168.1.3 --duration 60 --diag
 # kill -9       : test LWT offline (~3 s với --keepalive 2 mặc định)
 # Theo dõi: docker compose logs -f backend | grep NORMALIZED
 ```
+
+## Dữ liệu đi đâu (M3)
+
+Pipeline `mqtt → parser → persist` ghi 3 kho; mọi timestamp là **server receive time** (`ts` payload = 0, bỏ qua):
+
+| Kho | Nội dung | Xem nhanh |
+|---|---|---|
+| InfluxDB bucket `plc` | measurement `telemetry` (tags gateway/slave/adapter, fields sparse) + `diag` | `docker compose exec influxdb influx query --token "$INFLUX_TOKEN" --org signalbridge 'from(bucket:"plc")\|>range(start:-5m)\|>filter(fn:(r)=>r._measurement=="telemetry")\|>limit(n:5)'` |
+| Redis | `sb:latest:{gw}:{slave}` (hash signals + `_received_at`,`_seq`), `sb:status:{gw}`, `sb:last_seen:{gw}` | `docker compose exec redis redis-cli HGETALL sb:latest:GW_S7200_01:1` |
+| Postgres | `gateways`/`slaves` (upsert từ `info`), `gateway_events` (event + STATUS_ONLINE/OFFLINE chỉ khi đổi trạng thái) | `docker compose exec postgres psql -U sb -d signalbridge -c "SELECT * FROM gateway_events ORDER BY id DESC LIMIT 10"` |
+
+Counter lỗi ghi + số điểm đã flush: `curl localhost/api/v1/ingestion/stats`.

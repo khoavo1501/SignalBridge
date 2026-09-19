@@ -31,7 +31,7 @@ async def _adapter_key_for(gateway_id: str) -> str | None:
 
 
 async def handle_message(topic: str, payload_bytes: bytes) -> list[NormalizedMessage]:
-    """M2: parse + log. M3 sẽ nối pipeline vào stores tại đây."""
+    """Parse payload thành NormalizedMessage. Việc ghi stores diễn ra ở mqtt_client → persist."""
     stats["received"] += 1
     received_at = datetime.now(UTC)
     gateway_id = topic.split("/")[1] if len(topic.split("/")) >= 2 else topic

@@ -4,7 +4,7 @@ import logging
 import aiomqtt
 
 from app.config import get_settings
-from app.ingestion import pipeline
+from app.ingestion import persist, pipeline
 
 log = logging.getLogger("signalbridge.mqtt")
 
@@ -42,7 +42,9 @@ async def run_ingestion() -> None:
                         data = bytes(payload)
                     else:
                         data = bytes(str(payload), "utf-8")
-                    await pipeline.handle_message(topic, data)
+                    messages = await pipeline.handle_message(topic, data)
+                    for msg in messages:
+                        await persist.persist_message(msg)
         except aiomqtt.MqttError as exc:
             log.warning("MQTT connection lost: %s — retry in %.1fs", exc, backoff)
         except Exception:
