@@ -2,7 +2,7 @@
 
 - **Ngày hoàn thành:** 2026-09-19
 - **Trạng thái:** ✅ Done
-- **Commit/PR:** chờ commit (xem mục 5)
+- **Commit/PR:** `9b9e39a` feat: M0 scaffolding (main, chưa có remote — CI chưa chạy thật)
 
 ## 1. Mục tiêu (PROJECT_PLAN.md §7 M0)
 
