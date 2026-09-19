@@ -2,7 +2,7 @@
 
 - **Ngày hoàn thành:** 2026-09-19
 - **Trạng thái:** ✅ Done
-- **Commit/PR:** chờ commit
+- **Commit/PR:** `63cb951` feat: M1 docker infra (main, chưa có remote)
 
 ## 1. Mục tiêu (PROJECT_PLAN.md §7 M1)
 
