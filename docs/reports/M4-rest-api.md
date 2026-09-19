@@ -2,7 +2,7 @@
 
 - **Ngày hoàn thành:** 2026-09-19
 - **Trạng thái:** ✅ Done
-- **Commit/PR:** chờ commit
+- **Commit/PR:** 3651f57
 
 ## 1. Mục tiêu (PROJECT_PLAN.md §7 M4)
 
