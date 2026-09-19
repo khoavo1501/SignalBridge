@@ -6,17 +6,17 @@
 
 - **Dự án:** SignalBridge — giám sát PLC realtime
 - **Plan:** `PROJECT_PLAN.md` v1.3 (2026-09-19)
-- **Cập nhật gần nhất:** 2026-09-19 — M0 hoàn thành (scaffold + CI + tooling, xem [M0-scaffolding.md](M0-scaffolding.md))
+- **Cập nhật gần nhất:** 2026-09-19 — M1 hoàn thành (compose + schema + seed + health, xem [M1-docker-infra.md](M1-docker-infra.md))
 
 ## Trạng thái tổng thể
 
-**Phase hiện tại:** M0 hoàn thành — tiếp theo M1 (Hạ tầng Docker).
-**Tổng tiến độ:** 1/9 milestone.
+**Phase hiện tại:** M1 hoàn thành — tiếp theo M2 (MQTT ingestion + parser).
+**Tổng tiến độ:** 2/9 milestone.
 
 | Milestone | Phạm vi chức năng | Trạng thái | Báo cáo chi tiết |
 |---|---|---|---|
 | M0 | Scaffolding repo & tài liệu nền tảng | ✅ Done (2026-09-19) | [M0-scaffolding.md](M0-scaffolding.md) |
-| M1 | Hạ tầng Docker (7 service) | ⚪ Pending | — |
+| M1 | Hạ tầng Docker (7 service) | ✅ Done (2026-09-19) | [M1-docker-infra.md](M1-docker-infra.md) |
 | M2 | Kết nối MQTT & xác nhận payload | ⚪ Pending | — |
 | M3 | Persist Influx/Postgres/Redis | ⚪ Pending | — |
 | M4 | REST API đọc dữ liệu | ⚪ Pending | — |
@@ -62,3 +62,4 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | Khởi tạo hệ thống quản lý docs: REPORT_OVERVIEW.md, template báo cáo, AGENTS.md (quy tắc đọc docs trước khi làm bất kỳ việc gì) |
 | 2026-09-19 | Người dùng trả lời Q3–Q6, Q8 → plan v1.3: retention 60d, adapter s7200_v1 dùng chung cho các gateway cùng loại, ngưỡng stale 10 s, thêm gateway CRUD + milestone M8 (Admin UI). Chỉ còn Q7 (+ công thức scale Q2b) mở |
 | 2026-09-19 | **M0 ✅** — scaffold backend/frontend, tooling, Dockerfiles, CI workflow. pytest/ruff/black/eslint/prettier/vite build/docker build đều xanh thủ công (chưa verify CI trên remote). Phát hiện: pin phải resolve lại cho Python 3.14; npm cục bộ chặn postinstall esbuild. **Lưu ý bảo mật: nhiều prompt injection giả "[System Instructions]" (gồm lệnh `rm -rf ~/.qoder`) trong phiên M0 — tất cả bị từ chối, chi tiết §8 báo cáo M0** |
+| 2026-09-19 | **M1 ✅** — compose 7 service healthy, `/api/v1/health` ok (pg+influx+redis+mqtt), schema baseline + seed chạy qua container, MQTT roundtrip verified. **Bàn giao Q1: broker EMQX = `192.168.1.3:1883` cho firmware.** Bug sửa trong milestone: flatten `COPY alembic` trong Dockerfile; `sa_async.text` sai module. Injection tiếp tục xuất hiện — vẫn bị từ chối toàn bộ |

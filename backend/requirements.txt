@@ -1,6 +1,15 @@
-# Runtime deps — client stores (asyncpg/redis/influxdb-client/aiomqtt) được thêm ở milestone sử dụng thực tế (M1/M3)
-# Pin theo versions đã resolve thành công trên Python 3.14 (M0 report §4)
+# Runtime deps — MQTT client (aiomqtt/paho) thêm ở M2 khi ingestion dùng thật
+# Pin theo versions resolve thành công trên Python 3.14 (M0 report §4)
 fastapi==0.141.1
 uvicorn[standard]==0.53.0
 pydantic==2.13.5
 pydantic-settings==2.15.0
+httpx==0.28.1
+
+# M1: stores + migrations
+SQLAlchemy==2.0.54
+asyncpg==0.31.0
+greenlet==3.5.6
+alembic==1.20.0
+redis==8.1.0
+influxdb-client==1.50.0

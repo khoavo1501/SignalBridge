@@ -9,26 +9,33 @@ Web app giám sát realtime dữ liệu PLC qua gateway MQTT. Thiết kế chi t
 3. `docs/payloads/` — ground truth payload từ gateway.
 4. `AGENTS.md` — quy tắc bắt buộc với agent/collaborator.
 
-## Chạy local (phase hiện tại: M0 — chỉ scaffold)
+## Chạy local
 
-Yêu cầu: Python ≥ 3.12, Node ≥ 22, Docker (từ M1).
+Yêu cầu: Python ≥ 3.12, Node ≥ 22, Docker + Docker Compose.
+
+```bash
+cp .env.example .env        # đổi các giá trị change-me (secret)
+
+docker compose up -d --build   # 7 service: emqx, postgres, influxdb, redis, backend, frontend, nginx
+curl http://localhost/api/v1/health   # {"status":"ok","checks":{...}}
+# UI: http://localhost/  ·  EMQX dashboard: http://localhost:18083  ·  API docs: http://localhost:8000/docs
+```
+
+Dev mode không cần compose cho backend/frontend:
 
 ```bash
 # Backend
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest                                   # 2 smoke tests
-uvicorn app.main:app --reload            # http://localhost:8000/api/v1/healthz
+pytest
+uvicorn app.main:app --reload            # /health sẽ degraded nếu stores chưa chạy — bình thường
 
 # Frontend
 cd frontend
-npm install
+npm install                              # lưu ý: npm cục bộ chặn postinstall esbuild → `npm install-scripts approve esbuild`
 npm run dev                              # http://localhost:5173
-npm run build && npm run lint            # kiểm tra CI-local
 ```
-
-Toàn bộ stack (EMQX, Postgres, InfluxDB, Redis, backend, frontend, Nginx) chạy bằng `docker compose up -d` **từ Milestone 1** — file `docker-compose.yml` chưa tồn tại ở M0.
 
 ## Cấu trúc
 
