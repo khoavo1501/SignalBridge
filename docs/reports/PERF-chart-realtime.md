@@ -2,7 +2,7 @@
 
 - **Ngày hoàn thành:** 2026-09-20
 - **Trạng thái:** ✅ Done
-- **Commit/PR:** (hash ghi ở commit docs liền sau)
+- **Commit/PR:** `1038126`
 - **Nguồn yêu cầu:** user report 2026-09-20 — "giật lag khi để dữ liệu trong 1h" + "reload lại trang thì chart trong dashboard lại chạy lại, hiển thị như cửa sổ trượt, nếu ban đầu chưa có dữ liệu thì giá trị 0"
 
 ## 1. Mục tiêu
