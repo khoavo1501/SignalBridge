@@ -2,7 +2,7 @@
 
 - **Ngày hoàn thành:** 2026-09-20
 - **Trạng thái:** ✅ Done
-- **Commit/PR:** _(ghi ở commit docs ngay sau commit feat)_
+- **Commit/PR:** `2c6fa4a — feat: M7 frontend chi tiết`
 
 ## 1. Mục tiêu (chiếu PROJECT_PLAN.md §7)
 
