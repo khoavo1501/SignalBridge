@@ -2,9 +2,16 @@ import { RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { apiGet } from "../api/client";
-import type { DiagResponse, GatewayRow } from "../api/types";
+import type { DiagResponse, GatewayRow, HistoryResponse } from "../api/types";
 import { useLive } from "../state/LiveContext";
 import { fmtAgo, fmtClock, fmtNum } from "../state/format";
+
+interface SeqGap {
+  pct: number; // % seq vắng mặt trong cửa sổ 1 h (R1: chỉ ước lượng — telemetry QoS 0)
+  lost: number; // số bước seq nhảy
+  expected: number; // last - first + 1
+  last: number;
+}
 
 interface DiagRow {
   gateway_id: string;
@@ -15,6 +22,25 @@ interface DiagRow {
   tx_failures: number | null;
   mqtt_reconnect: number | null;
   uptime_s: number | null;
+  seqGap: SeqGap | null;
+}
+
+async function fetchSeqGap(gatewayId: string): Promise<SeqGap | null> {
+  const from = new Date(Date.now() - 3600_000).toISOString();
+  try {
+    const h = await apiGet<HistoryResponse>(
+      `/gateways/${gatewayId}/history?slave=1&signals=seq&agg=raw&from=${from}`,
+    );
+    const pts = h.series[0]?.points.map((p) => Number(p.v)).filter(Number.isFinite) ?? [];
+    if (pts.length < 2) return null;
+    let lost = 0;
+    for (let i = 1; i < pts.length; i++) lost += Math.max(0, pts[i] - pts[i - 1] - 1);
+    const expected = pts[pts.length - 1] - pts[0] + 1;
+    if (expected < 1) return null;
+    return { pct: (lost / expected) * 100, lost, expected, last: pts[pts.length - 1] };
+  } catch {
+    return null; // influx trống / gateway chưa có telemetry
+  }
 }
 
 export default function DiagnosticsPage() {
@@ -40,6 +66,7 @@ export default function DiagnosticsPage() {
             tx_failures: d?.latest?.tx_failures ?? null,
             mqtt_reconnect: d?.latest?.mqtt_reconnect ?? null,
             uptime_s: d?.latest?.uptime_s ?? null,
+            seqGap: await fetchSeqGap(g.gateway_id),
             note: d?.note ?? null,
           };
         }),
@@ -94,6 +121,7 @@ export default function DiagnosticsPage() {
               <th>tx fail</th>
               <th>mqtt reconn</th>
               <th>uptime (s)</th>
+              <th title="R1: telemetry QoS 0 — nhảy seq chỉ là ước lượng mất gói">seq gap 1h*</th>
             </tr>
           </thead>
           <tbody>
@@ -120,11 +148,21 @@ export default function DiagnosticsPage() {
                 <td className={`num${r.tx_failures ? " amber" : ""}`}>{fmtNum(r.tx_failures)}</td>
                 <td className="num">{fmtNum(r.mqtt_reconnect)}</td>
                 <td className="num">{fmtNum(r.uptime_s)}</td>
+                <td
+                  className={`num${r.seqGap && r.seqGap.lost > 0 ? " amber" : ""}`}
+                  title={
+                    r.seqGap
+                      ? `seq hiện tại ${r.seqGap.last} · nhảy ${r.seqGap.lost}/${r.seqGap.expected} bước trong 1 h`
+                      : "chưa đủ dữ liệu seq"
+                  }
+                >
+                  {r.seqGap ? `${r.seqGap.pct.toFixed(2).replace(".", ",")}%` : "—"}
+                </td>
               </tr>
             ))}
             {!rows.length ? (
               <tr>
-                <td colSpan={8} className="dim">
+                <td colSpan={9} className="dim">
                   Chưa có gateway nào.
                 </td>
               </tr>

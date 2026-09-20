@@ -31,6 +31,8 @@ export default function EventsPage() {
   const [device, setDevice] = useState("all");
   const [codes, setCodes] = useState<string[]>([]);
   const [page, setPage] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasOlder, setHasOlder] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -45,10 +47,39 @@ export default function EventsPage() {
       setRest(
         resps.filter(Boolean).flatMap((x) => x!.r.events.map((e) => ({ ...e, gateway_id: x!.gw }))),
       );
+      setHasOlder(true);
     } catch {
       setRest([]);
     }
   }, []);
+
+  // M7: phân trang sâu — con trỏ `before` của API (limit 200/lần/gateway), gộp vào rest, dedup ở `all`
+  const loadOlder = useCallback(async () => {
+    setLoadingMore(true);
+    try {
+      const oldest = new Map<string, string>();
+      for (const e of rest) {
+        const cur = oldest.get(e.gateway_id);
+        if (!cur || Date.parse(e.received_at) < Date.parse(cur))
+          oldest.set(e.gateway_id, e.received_at);
+      }
+      const resps = await Promise.all(
+        [...oldest.entries()].map(async ([gw, before]) => {
+          const r = await apiGet<EventsResponse>(
+            `/gateways/${gw}/events?limit=200&before=${encodeURIComponent(before)}`,
+          ).catch(() => null);
+          return { gw, r };
+        }),
+      );
+      const older = resps
+        .filter((x) => x.r)
+        .flatMap((x) => x.r!.events.map((e) => ({ ...e, gateway_id: x.gw })));
+      setRest((prev) => [...prev, ...older]);
+      if (older.length === 0) setHasOlder(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [rest]);
 
   useEffect(() => {
     void load();
@@ -217,9 +248,20 @@ export default function EventsPage() {
 
       <div className="page-head" style={{ margin: "4px 0 0", alignItems: "center" }}>
         <span className="dim">
-          Trang {page + 1} / {pages}
+          Trang {page + 1} / {pages} · {filtered.length} sự kiện trong bộ nhớ ({rest.length} từ
+          REST)
         </span>
         <div className="pill-row">
+          {hasOlder ? (
+            <button
+              className="btn"
+              disabled={loadingMore}
+              onClick={() => void loadOlder()}
+              title="Tải 200 sự kiện cũ hơn mỗi device (con trỏ before)"
+            >
+              <ChevronLeft size={14} aria-hidden="true" /> Tải thêm (cũ hơn)
+            </button>
+          ) : null}
           <button className="btn" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
             <ChevronLeft size={14} aria-hidden="true" /> Trước
           </button>

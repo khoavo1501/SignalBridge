@@ -6,6 +6,7 @@ import DashboardPage from "./pages/DashboardPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
 import EventsPage from "./pages/EventsPage";
 import GatewayDetailPage from "./pages/GatewayDetailPage";
+import NotFoundPage from "./pages/NotFoundPage";
 import SlaveDetailPage from "./pages/SlaveDetailPage";
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
             <Route path="/diagnostics" element={<DiagnosticsPage />} />
             <Route path="/gateways/:id" element={<GatewayDetailPage />} />
             <Route path="/gateways/:id/slaves/:addr" element={<SlaveDetailPage />} />
+            <Route path="*" element={<NotFoundPage />} />
             {/* M8: /admin */}
           </Route>
         </Routes>

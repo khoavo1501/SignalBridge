@@ -6,12 +6,12 @@
 
 - **Dự án:** SignalBridge — giám sát PLC realtime
 - **Plan:** `PROJECT_PLAN.md` v1.3 (2026-09-19)
-- **Cập nhật gần nhất:** 2026-09-19 — M6 hoàn thành + M6b redesign giao diện theo tham chiếu admin IIoT (5 route, xem [M6-frontend-dashboard.md](M6-frontend-dashboard.md))
+- **Cập nhật gần nhất:** 2026-09-20 — M7 hoàn thành (drill-down slave + chart realtime + gap seq + phân trang events, xem [M7-frontend-detail.md](M7-frontend-detail.md))
 
 ## Trạng thái tổng thể
 
-**Phase hiện tại:** M6 (+M6b redesign) hoàn thành — phạm vi M7 (chi tiết gateway/slave + chart) đã được cover phần lớn trong M6b; khi bắt đầu M7 cần chốt phạm vi còn lại với người dùng.
-**Tổng tiến độ:** 7/9 milestone.
+**Phase hiện tại:** M7 hoàn thành — còn **M8 (Admin UI)** là milestone cuối của phase 1; backlog M8 gom từ báo cáo M6 §5 và M7 §5.
+**Tổng tiến độ:** 8/9 milestone.
 
 | Milestone | Phạm vi chức năng | Trạng thái | Báo cáo chi tiết |
 |---|---|---|---|
@@ -22,7 +22,7 @@
 | M4 | REST API đọc dữ liệu | ✅ Done (2026-09-19) | [M4-rest-api.md](M4-rest-api.md) |
 | M5 | WebSocket realtime | ✅ Done (2026-09-19) | [M5-websocket-realtime.md](M5-websocket-realtime.md) |
 | M6 | Frontend dashboard tổng quan (+ M6b redesign 5 trang theo tham chiếu admin IIoT) | ✅ Done (2026-09-19) | [M6-frontend-dashboard.md](M6-frontend-dashboard.md) |
-| M7 | Frontend chi tiết gateway/slave | ⚪ Pending | — |
+| M7 | Frontend chi tiết gateway/slave | ✅ Done (2026-09-20) | [M7-frontend-detail.md](M7-frontend-detail.md) |
 | M8 | Admin UI đăng ký & quản lý gateway (Q8) | ⚪ Pending | — |
 
 Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
@@ -43,6 +43,8 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | **WS telemetry throttle = aggregate latest-wins + trailing flush đúng boundary** (không phải gate-drop — gate-drop bị quantize theo input: 100 ms input + 250 ms gate → 300 ms thực tế, fail DoD ±10%) | M5 report §4, PROJECT_PLAN §4.2 |
 | 2026-09-19 | **Badge M6 tính phía client bằng tick 1 s** (`badgeOf = broker state × độ tươi telemetry`) — server không gửi frame mỗi giây nên transition online→stale phải do UI tự recompute; đạt "≤ ngưỡng + 1 nhịp UI" | M6 report §4, ràng buộc #5 |
 | 2026-09-19 | **M6b: một socket WS dùng chung mọi route** (LiveProvider bọc BrowserRouter, không phải per-page) — tránh N socket khi điều hướng SPA; verify `ws_clients` ổn định qua 5 reload | M6 report §2/§3 |
+| 2026-09-20 | **M7: chart slave dùng trục thời gian hợp nhất** (rows = union mọi mốc của mọi signal đang chọn + WS tail; signal vắng tại mốc → null → Line `connectNulls=false` đứt đoạn) — gap hc0 hiển thị đúng, không crash; hệ quả: khoảng im lặng hoàn toàn chỉ thấy đứt khi có signal khác phủ cùng khoảng (M7 report §4.3) | M7 report §2/§4 |
+| 2026-09-20 | **M7: `lastSeen` của badge slave = max(REST /latest, mốc WS tail cuối)** — REST refresh 15 s > ngưỡng stale 10 s nên không được tính độ tươi chỉ từ /latest | M7 report §4.4 |
 | 2026-09-19 | Parser theo adapter pattern; payload gateway loại mới phải lưu vào `docs/payloads/` trước khi viết adapter | PROJECT_PLAN.md §2, §6 |
 
 ## Câu hỏi mở còn lại
@@ -73,3 +75,4 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | **M6 ✅** — dashboard tổng quan: `api/client.ts` + `useGatewaySocket` (backoff 1→30 s), `StatusBadge` 3 trạng thái tooltip Việt, `GatewayCard` nhãn "(raw)" (Q2), `SummaryPage` REST nền + WS snapshot/frames đè, tick 1 s recompute badge (ràng buộc #5). DoD live qua nginx: ai_raw đổi liên tục nhịp 250 ms, stale hiển thị ngay khi status online + telemetry dừng, offline ~0,5 s sau kill -9, `ws_clients` 1→3→1 không leak, reconnect sau restart backend, build TS strict sạch, 69 test backend không đổi |
 | 2026-09-19 | **M6b ✅ redesign** theo 5 screenshot tham chiếu admin IIoT (user yêu cầu, skills design-taste-frontend + redesign-existing-projects): dark tokens (nền #0c0e12, amber #dfa24a đơn accent, mono cho số), topbar + sidebar, 5 route `/` `/events` `/diagnostics` `/gateways/:id` `/gateways/:id/slaves/:addr` — KPI row, card sparkline (seed /history + stream WS), badge per-slave, chart Recharts 15m/1h/6h/24h, Events filter severity/device/code + phân trang, Diagnostics + history từ frame. Verify lại kết nối backend qua nginx: đủ 3 nhịp badge online→stale→offline→online trên UI mới không reload, filter 36→23 dòng, không leak WS (socket dùng chung). Fix phát sinh: auto-refresh REST 5 s cho GatewayDetail (badge per-slave kẹt stale), `.badge` nowrap. Phạm vi M7 cover phần lớn — chốt phần còn lại trước khi bắt đầu |
 | 2026-09-19 | **Tài liệu hạ tầng** — [INFRA-ports-va-tai-khoan.md](INFRA-ports-va-tai-khoan.md): bảng cổng (public + nội bộ docker network), tài khoản truy cập từng hệ thống (không ghi secrets — trỏ biến trong `.env`), việc mở cho production (bind 127.0.0.1, MQTT ACL, Redis password, AUTH_ENABLED) |
+| 2026-09-20 | **M7 ✅** — drill-down slave realtime: `subscribeTelemetry` pub-sub trong LiveContext, SlaveDetailPage viết lại (4 khoảng thời gian, pills signal, trục hợp nhất + gap null, WS tail 250 ms), Events phân trang sâu bằng con trỏ `before`, cột seq gap 1h ước lượng (R1) ở Chẩn đoán, trang 404. DoD live: ai_raw 1h 0,105 s/3066 điểm khớp influx CLI 3136 (lệch mép cửa sổ), events 81=81 khớp psql, gap hc0 đứt đoạn không crash (6119 điểm · 4125 mốc trống), 404/503 influx error-box không white-screen. **Phát hiện: `/history` raw flux `sort asc + limit` giữ điểm CŨ NHẤT — sim 100 ms đã chạm cap 5000 (5.031 điểm/h); workaround frontend `limit=20000`, fix gốc backend vào backlog M8.** 2 fix UI: badge trễ giả (lastSeen=max REST,WS), truncation. Build TS strict sạch |

@@ -27,6 +27,15 @@ export interface SessionDiag extends DiagData {
   gw: string;
 }
 
+// Khung telemetry đẩy lên WS — trang SlaveDetail nối vào chart đang hiển thị (M7)
+export interface TelemetryTick {
+  gateway_id: string;
+  slave_addr: number;
+  seq: number | null;
+  tsMs: number;
+  signals: Record<string, boolean | number>;
+}
+
 interface LiveState {
   live: LiveMap;
   thresholdS: number;
@@ -39,6 +48,7 @@ interface LiveState {
   error: string | null;
   refresh: () => void;
   badge: (gwId: string) => ReturnType<typeof badgeOf> | null;
+  subscribeTelemetry: (cb: (t: TelemetryTick) => void) => () => void;
 }
 
 const Ctx = createContext<LiveState | null>(null);
@@ -55,6 +65,14 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const seededRef = useRef(false);
   const thresholdRef = useRef(thresholdS);
   thresholdRef.current = thresholdS;
+  const feedSubs = useRef(new Set<(t: TelemetryTick) => void>());
+
+  const subscribeTelemetry = useCallback((cb: (t: TelemetryTick) => void) => {
+    feedSubs.current.add(cb);
+    return () => {
+      feedSubs.current.delete(cb);
+    };
+  }, []);
 
   const loadRest = useCallback(async () => {
     setLoading(true);
@@ -108,6 +126,14 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     if (isTelemetry(frame)) {
       setLive((prev) => applyFrame(prev, thresholdRef.current, frame)[0]);
       const { gateway_id, signals } = frame.data;
+      const tick: TelemetryTick = {
+        gateway_id,
+        slave_addr: frame.data.slave_addr ?? 1,
+        seq: frame.data.seq ?? null,
+        tsMs: Date.parse(frame.data.received_at),
+        signals,
+      };
+      for (const cb of feedSubs.current) cb(tick);
       const hit = Object.entries(signals).find(
         ([k, v]) => typeof v === "number" && !k.startsWith("di_"),
       );
@@ -158,6 +184,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       error,
       refresh: () => void loadRest(),
       badge,
+      subscribeTelemetry,
     }),
     [
       live,
@@ -171,6 +198,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       error,
       loadRest,
       badge,
+      subscribeTelemetry,
     ],
   );
 
