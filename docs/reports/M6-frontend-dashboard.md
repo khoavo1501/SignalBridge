@@ -2,7 +2,7 @@
 
 - **Ngày hoàn thành:** 2026-09-19
 - **Trạng thái:** ✅ Done (M6 + M6b)
-- **Commit/PR:** (ghi hash sau commit `feat: M6 frontend dashboard tong quan`)
+- **Commit/PR:** `85bf10a` — feat: M6 frontend dashboard — 5 trang UI dark admin, socket WS dùng chung LiveProvider, badge 3 trạng thái client-side, sparkline + chart Recharts
 
 ## 1. Mục tiêu (chiếu PROJECT_PLAN.md §7)
 
