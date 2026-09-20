@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, Inbox, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { apiGet } from "../api/client";
-import type { EventsResponse } from "../api/types";
+import type { AggregateEventsResponse } from "../api/types";
 import { useLive, type SessionEvent } from "../state/LiveContext";
 import { fmtClock } from "../state/format";
 
@@ -33,53 +33,35 @@ export default function EventsPage() {
   const [page, setPage] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasOlder, setHasOlder] = useState(true);
+  const [cursor, setCursor] = useState<string | null>(null);
 
+  // M8: endpoint aggregate /api/v1/events — một request thay cho lặp theo gateway (M6/M7)
   const load = useCallback(async () => {
     try {
-      const list = await apiGet<{ gateways: { gateway_id: string }[] }>("/gateways");
-      const resps = await Promise.all(
-        list.gateways.map((g) =>
-          apiGet<EventsResponse>(`/gateways/${g.gateway_id}/events?limit=200`)
-            .then((r) => ({ gw: g.gateway_id, r }))
-            .catch(() => null),
-        ),
-      );
-      setRest(
-        resps.filter(Boolean).flatMap((x) => x!.r.events.map((e) => ({ ...e, gateway_id: x!.gw }))),
-      );
-      setHasOlder(true);
+      const r = await apiGet<AggregateEventsResponse>("/events?limit=200");
+      setRest(r.events);
+      setCursor(r.next_before);
+      setHasOlder(r.next_before !== null);
     } catch {
       setRest([]);
+      setHasOlder(false);
     }
   }, []);
 
-  // M7: phân trang sâu — con trỏ `before` của API (limit 200/lần/gateway), gộp vào rest, dedup ở `all`
   const loadOlder = useCallback(async () => {
+    if (!cursor) return;
     setLoadingMore(true);
     try {
-      const oldest = new Map<string, string>();
-      for (const e of rest) {
-        const cur = oldest.get(e.gateway_id);
-        if (!cur || Date.parse(e.received_at) < Date.parse(cur))
-          oldest.set(e.gateway_id, e.received_at);
-      }
-      const resps = await Promise.all(
-        [...oldest.entries()].map(async ([gw, before]) => {
-          const r = await apiGet<EventsResponse>(
-            `/gateways/${gw}/events?limit=200&before=${encodeURIComponent(before)}`,
-          ).catch(() => null);
-          return { gw, r };
-        }),
+      const r = await apiGet<AggregateEventsResponse>(
+        `/events?limit=200&before=${encodeURIComponent(cursor)}`,
       );
-      const older = resps
-        .filter((x) => x.r)
-        .flatMap((x) => x.r!.events.map((e) => ({ ...e, gateway_id: x.gw })));
-      setRest((prev) => [...prev, ...older]);
-      if (older.length === 0) setHasOlder(false);
+      setRest((prev) => [...prev, ...r.events]);
+      setCursor(r.next_before);
+      setHasOlder(r.next_before !== null);
     } finally {
       setLoadingMore(false);
     }
-  }, [rest]);
+  }, [cursor]);
 
   useEffect(() => {
     void load();

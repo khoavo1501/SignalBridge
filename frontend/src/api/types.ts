@@ -93,6 +93,16 @@ export interface EventsResponse {
   next_before: string | null;
 }
 
+// REST /api/v1/events — aggregate toàn hệ thống (M8)
+export interface AggregateEventRow extends EventRow {
+  gateway_id: string;
+}
+
+export interface AggregateEventsResponse {
+  events: AggregateEventRow[];
+  next_before: string | null;
+}
+
 // REST /gateways (meta + slaves + state)
 export interface SlaveRow {
   id?: number;
@@ -114,6 +124,16 @@ export interface GatewayRow {
     mac: string | null;
   };
   slaves: SlaveRow[];
+}
+
+// M8 admin
+export interface UnknownGateway {
+  gateway_id: string;
+  last_seen: string;
+}
+
+export interface AdaptersResponse {
+  adapters: { key: string }[];
 }
 
 export interface LatestSlave {

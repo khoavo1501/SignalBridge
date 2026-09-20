@@ -18,6 +18,18 @@ def _last_seen_key(gateway_id: str) -> str:
     return f"sb:last_seen:{gateway_id}"
 
 
+async def delete_gateway(gateway_id: str, slave_addrs: list[int]) -> int:
+    """Dọn key Redis khi admin xóa gateway (§4.1 — dữ liệu Influx giữ nguyên). Trả số key đã xóa."""
+    r = get_redis()
+    keys = {_status_key(gateway_id), _last_seen_key(gateway_id)}
+    keys |= {_latest_key(gateway_id, addr) for addr in slave_addrs}
+    # latest key vẫn tồn tại khi slave chưa có row trong DB → scan thêm, không tin mỗi slaves
+    # (gateway_id đã validate regex [A-Za-z0-9_-] nên an toàn trong match pattern)
+    async for k in r.scan_iter(match=f"sb:latest:{gateway_id}:*", count=200):
+        keys.add(k.decode() if isinstance(k, bytes) else k)
+    return int(await r.delete(*keys))
+
+
 async def write_telemetry(msg: Telemetry) -> None:
     try:
         r = get_redis()

@@ -15,6 +15,17 @@ stats: dict[str, int] = {"received": 0, "parsed": 0, "parse_errors": 0, "unknown
 _adapter_cache: dict[str, str] = {}
 _adapter_cache_loaded: float = 0.0
 
+# M8: gateway_id thấy publish trên broker nhưng chưa có trong DB — cho trang admin quick-add
+_unknown_seen: dict[str, str] = {}
+
+
+def _record_unknown(gateway_id: str, received_at: datetime) -> None:
+    _unknown_seen[gateway_id] = received_at.isoformat().replace("+00:00", "Z")
+
+
+def unknown_seen_snapshot() -> dict[str, str]:
+    return dict(_unknown_seen)
+
 
 async def _adapter_key_for(gateway_id: str) -> str | None:
     global _adapter_cache, _adapter_cache_loaded
@@ -53,6 +64,7 @@ async def handle_message(topic: str, payload_bytes: bytes) -> list[NormalizedMes
             log.error("unknown adapter_key=%s for gateway=%s", adapter_key, gateway_id)
             return []
         stats["unknown_gateway"] += 1
+        _record_unknown(gateway_id, received_at)
         log.warning("unknown gateway=%s (not registered), trying match() fallback", gateway_id)
         adapter = registry.resolve_by_match(gateway_id, topic, payload)
         if adapter is None:

@@ -94,7 +94,56 @@ async def fetch_events(gateway_pk: int, limit: int, before=None, code=None) -> l
         return [dict(r._mapping) for r in rows]
 
 
+async def fetch_events_all(limit: int, before=None, code=None) -> list[dict]:
+    """Events của MỌI gateway (kể cả disabled — log lịch sử), gộp theo thời gian."""
+    sql = """
+        SELECT e.received_at, e.code, e.severity, e.message, e.source, e.slave_addr,
+               g.gateway_id
+        FROM gateway_events e JOIN gateways g ON g.id = e.gateway_id
+    """
+    params: dict = {"limit": limit}
+    where = []
+    if before is not None:
+        where.append("e.received_at < :before")
+        params["before"] = before
+    if code:
+        where.append("e.code = :code")
+        params["code"] = code
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY e.received_at DESC, e.id DESC LIMIT :limit"
+    async with get_engine().connect() as conn:
+        rows = await conn.execute(sa.text(sql), params)
+        return [dict(r._mapping) for r in rows]
+
+
 PATCHABLE = {"display_name", "adapter_key", "enabled"}
+
+
+async def insert_gateway(gateway_id: str, display_name: str, adapter_key: str) -> dict | None:
+    """INSERT mới; trả None nếu gateway_id đã tồn tại (409 do route xử lý)."""
+    async with get_engine().begin() as conn:
+        rows = await conn.execute(
+            sa.text(
+                "INSERT INTO gateways (gateway_id, display_name, adapter_key) "
+                "VALUES (:gid, :dn, :key) ON CONFLICT (gateway_id) DO NOTHING RETURNING "
+                + _GATEWAY_COLS
+            ),
+            {"gid": gateway_id, "dn": display_name, "key": adapter_key},
+        )
+        r = rows.first()
+        return dict(r._mapping) if r else None
+
+
+async def delete_gateway(gateway_id: str) -> dict | None:
+    """Xóa row (cascade slaves/signal_defs/gateway_events theo FK §3.1). Trả None nếu không có."""
+    async with get_engine().begin() as conn:
+        rows = await conn.execute(
+            sa.text("DELETE FROM gateways WHERE gateway_id = :gid RETURNING " + _GATEWAY_COLS),
+            {"gid": gateway_id},
+        )
+        r = rows.first()
+        return dict(r._mapping) if r else None
 
 
 async def patch_gateway(gateway_id: str, fields: dict) -> dict | None:

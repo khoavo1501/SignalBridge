@@ -78,7 +78,12 @@ Tất cả qua Nginx tại `http://localhost/api/v1` (khái quát: `PROJECT_PLAN
 GET  /dashboard/summary                 # badge online/stale/offline + primary metrics (raw, scaled=false)
 GET  /gateways                          # danh sách + meta (fw/ip/mac từ info) + slaves
 GET  /gateways/{id}[/latest|/history|/events|/diag]
-     ?signals=ai_raw,hc0&agg=10s&from=...&to=...   # history: window ≤ 7 ngày, agg raw|duration
+     ?signals=ai_raw,hc0&agg=10s&from=...&to=...   # history: window ≤ 7 ngày, agg raw|duration; vượt limit giữ điểm MỚI NHẤT (M8)
+GET  /events?limit=200&before=...       # aggregate toàn hệ thống 1 request (M8), con trỏ next_before
+POST   /gateways                        # đăng ký gateway mới {gateway_id, adapter_key, display_name?} → 201 | 400 | 409 | 422 (M8)
+GET  /gateways/unknown                  # gateway thấy trên broker nhưng chưa có row DB (M8)
+GET  /adapters                          # danh sách adapter_key trong registry (M8)
+DELETE /gateways/{id}                   # xóa cascade PG + dọn key Redis (scan `sb:latest:{id}:*`), Influx giữ (M8)
 PATCH /gateways/{id}                    # display_name | adapter_key | enabled
 ```
 
@@ -88,10 +93,12 @@ Lỗi trả `{"error": {"code": "...", "message": "..."}}` (404 gateway_not_foun
 
 `ws://localhost/ws` (qua Nginx). Client gửi `{"type":"subscribe","gateways":["GW_S7200_01"]}` — thiếu `gateways` = nhận hết. Server trả envelope `{"type","ts","data"}` với kind: `snapshot` (frame đầu khi connect — summary §4.1), `telemetry` (throttle latest-wins `WS_TELEMETRY_MIN_INTERVAL_MS=250`), `status`/`event`/`info`/`diag` (gửi ngay). Heartbeat: uvicorn protocol ping 30 s. Nhiều instance backend: bật `WS_PUBSUB_ENABLED=true` (fan-out Redis Pub/Sub kênh `sb:ws`). Đo nhanh: `cd backend && python tests/e2e_ws.py rate|wait|hold --url ws://localhost:8000/ws` (cần `pip install websockets`).
 
-## Dashboard (M6 + M6b redesign + M7 chi tiết)
+## Dashboard (M6 + M6b redesign + M7 chi tiết + M8 admin)
 
-Giao diện dark theo tham chiếu admin IIoT: topbar (chip live WS) + sidebar, 5 route — `/` (KPI + card gateway có sparkline), `/gateways/:id` (breadcrumb, meta fw/hw/ip/mac, bảng PLC badge per-slave, panel cảnh báo), `/gateways/:id/slaves/:addr` (chart Recharts tầm nhìn 15m/1h/6h/24h qua `/history`), `/events` (lọc severity/device/code + phân trang, nút "Tải thêm (cũ hơn)" dùng con trỏ `before`), `/diagnostics` (bảng `/diag` + lịch sử diag từ frame WS + cột seq gap 1h ước lượng mất gói QoS 0); route lạ → trang 404.
+Giao diện dark theo tham chiếu admin IIoT: topbar (chip live WS) + sidebar, 6 route — `/` (KPI + card gateway có sparkline), `/gateways/:id` (breadcrumb, meta fw/hw/ip/mac, bảng PLC badge per-slave, panel cảnh báo), `/gateways/:id/slaves/:addr` (chart Recharts tầm nhìn 15m/1h/6h/24h qua `/history`), `/events` (lọc severity/device/code + phân trang, nút "Tải thêm (cũ hơn)" dùng con trỏ `before`), `/diagnostics` (bảng `/diag` + lịch sử diag từ frame WS + cột seq gap 1h ước lượng mất gói QoS 0), `/admin` (quản trị gateway — xem M8 bên dưới); route lạ → trang 404.
 
 M7: trang slave chọn từng signal (pills), trục thời gian hợp nhất — signal vắng tại mốc nào (vd `hc0` khi firmware không poll region 54–58) → đường đứt đoạn tại đó; WS stream nối vào đuôi chart đang xem giữa hai lần REST 15 s.
+
+M8: route `/admin` (sidebar "Quản trị → Gateway") — quản lý gateway không cần SQL: bảng gateways (link chi tiết), form thêm gateway (chọn adapter từ `/adapters`), sửa `display_name` inline, nút tắt/bật (`enabled`), xóa có xác nhận (PG cascade + dọn Redis, Influx giữ), panel "chưa đăng ký" từ telemetry lạ trên broker với nút thêm nhanh; lỗi 400/409/422 hiển thị thông báo thân thiện. Trang `/events` từ M8 dùng `GET /api/v1/events` aggregate (một request thay lặp theo gateway).
 
 Nguồn dữ liệu: REST seed lúc tải trang, sau đó **một socket WS dùng chung mọi route** (`LiveProvider`) cập nhật realtime — snapshot + telemetry throttle 250 ms + status/event/info/diag; tự reconnect backoff 1→30 s. Badge mỗi gateway tính phía client mỗi giây (broker state × độ tươi telemetry, ngưỡng `STALE_THRESHOLD_S=10`); badge slave lấy max(REST /latest, mốc WS cuối) để không nhấp trễ giả giữa 2 lần refresh; giá trị analog hiển thị raw + nhãn "(raw)" chờ Q2b. Trang GatewayDetail/SlaveDetail có auto-refresh REST (5 s / 15 s). Dev mode: `cd frontend && npm run dev` → `http://localhost:5173` (vite proxy sẵn `/api` và `/ws` sang `:8000`).

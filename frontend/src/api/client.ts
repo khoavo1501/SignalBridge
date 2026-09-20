@@ -9,11 +9,15 @@ export class ApiError extends Error {
   }
 }
 
-// Gọi /api/v1... — lỗi theo contract {"error":{code,message}} (backend/app/api/errors.py)
-export async function apiGet<T>(path: string): Promise<T> {
+// Gọi /api/v1... với method + body (M8 admin CRUD); lỗi theo contract {"error":{code,message}} (backend/app/api/errors.py)
+export async function apiSend<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`/api/v1${path}`);
+    res = await fetch(`/api/v1${path}`, {
+      method,
+      headers: body !== undefined ? { "content-type": "application/json" } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
   } catch (e) {
     throw new ApiError(0, "network_error", e instanceof Error ? e.message : "mạng lỗi");
   }
@@ -21,15 +25,20 @@ export async function apiGet<T>(path: string): Promise<T> {
     let code = "http_error";
     let message = `HTTP ${res.status}`;
     try {
-      const body = (await res.json()) as { error?: { code?: string; message?: string } };
-      if (body.error) {
-        code = body.error.code ?? code;
-        message = body.error.message ?? message;
+      const parsed = (await res.json()) as { error?: { code?: string; message?: string } };
+      if (parsed.error) {
+        code = parsed.error.code ?? code;
+        message = parsed.error.message ?? message;
       }
     } catch {
       // response không phải JSON — giữ default
     }
     throw new ApiError(res.status, code, message);
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+export async function apiGet<T>(path: string): Promise<T> {
+  return apiSend<T>("GET", path);
 }

@@ -40,7 +40,11 @@ def _history_fluxes(gateway_id, slave_addr, signals, start, stop, agg, limit) ->
     """Danh sách flux phải chạy + merge kết quả. Signal bool (quy ước tiền tố di_) không
     mean trực tiếp được; InfluxDB 2.7 không có typeof() để làm trong một query."""
     n = int(limit)
-    tail = f'\n|> sort(columns: ["_time"])\n|> limit(n: {n})'
+    # limit giữ điểm MỚI NHẤT (sort desc → cắt → sort asc); sort asc + limit suông sẽ giữ điểm CŨ
+    tail = (
+        f'\n|> sort(columns: ["_time"], desc: true)\n|> limit(n: {n})'
+        '\n|> sort(columns: ["_time"])'
+    )
     if not agg:
         return [_flux_base(gateway_id, slave_addr, signals, start, stop) + tail]
     numeric = [s for s in signals if not s.startswith("di_")]

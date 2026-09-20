@@ -281,6 +281,41 @@ a {
   transform: scale(0.98);
 }
 
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- admin form (M8) ---------- */
+.input {
+  padding: 7px 12px;
+  border-radius: var(--radius-ctl);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+
+.ok-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-panel);
+  border: 1px solid rgba(94, 193, 134, 0.35);
+  background: rgba(94, 193, 134, 0.08);
+  color: var(--green, #5ec186);
+  font-size: 13px;
+}
+
 /* ---------- badges ---------- */
 .badge {
   display: inline-flex;

@@ -6,12 +6,12 @@
 
 - **Dự án:** SignalBridge — giám sát PLC realtime
 - **Plan:** `PROJECT_PLAN.md` v1.3 (2026-09-19)
-- **Cập nhật gần nhất:** 2026-09-20 — M7 hoàn thành (drill-down slave + chart realtime + gap seq + phân trang events, xem [M7-frontend-detail.md](M7-frontend-detail.md))
+- **Cập nhật gần nhất:** 2026-09-20 — M8 hoàn thành (Admin UI CRUD gateway + gộp backlog `/history` newest-kept + `/events` aggregate, xem [M8-admin-ui.md](M8-admin-ui.md)) — **hết 9/9 milestone phase 1**
 
 ## Trạng thái tổng thể
 
-**Phase hiện tại:** M7 hoàn thành — còn **M8 (Admin UI)** là milestone cuối của phase 1; backlog M8 gom từ báo cáo M6 §5 và M7 §5.
-**Tổng tiến độ:** 8/9 milestone.
+**Phase hiện tại:** cả 9 milestone M0–M8 hoàn thành. Phần còn lại là **backlog sau M8** (plan §7): auth JWT thật, rules engine cảnh báo, alerting email/SMS, toàn màn hình xưởng, multi-user prefs; cộng bundle frontend 603 kB và 2 câu hỏi hardware Q2b/Q7.
+**Tổng tiến độ:** 9/9 milestone.
 
 | Milestone | Phạm vi chức năng | Trạng thái | Báo cáo chi tiết |
 |---|---|---|---|
@@ -23,7 +23,7 @@
 | M5 | WebSocket realtime | ✅ Done (2026-09-19) | [M5-websocket-realtime.md](M5-websocket-realtime.md) |
 | M6 | Frontend dashboard tổng quan (+ M6b redesign 5 trang theo tham chiếu admin IIoT) | ✅ Done (2026-09-19) | [M6-frontend-dashboard.md](M6-frontend-dashboard.md) |
 | M7 | Frontend chi tiết gateway/slave | ✅ Done (2026-09-20) | [M7-frontend-detail.md](M7-frontend-detail.md) |
-| M8 | Admin UI đăng ký & quản lý gateway (Q8) | ⚪ Pending | — |
+| M8 | Admin UI đăng ký & quản lý gateway (Q8) + backlog gộp (`/history` newest-kept, `/api/v1/events` aggregate) | ✅ Done (2026-09-20) | [M8-admin-ui.md](M8-admin-ui.md) |
 
 Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 
@@ -45,6 +45,9 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | **M6b: một socket WS dùng chung mọi route** (LiveProvider bọc BrowserRouter, không phải per-page) — tránh N socket khi điều hướng SPA; verify `ws_clients` ổn định qua 5 reload | M6 report §2/§3 |
 | 2026-09-20 | **M7: chart slave dùng trục thời gian hợp nhất** (rows = union mọi mốc của mọi signal đang chọn + WS tail; signal vắng tại mốc → null → Line `connectNulls=false` đứt đoạn) — gap hc0 hiển thị đúng, không crash; hệ quả: khoảng im lặng hoàn toàn chỉ thấy đứt khi có signal khác phủ cùng khoảng (M7 report §4.3) | M7 report §2/§4 |
 | 2026-09-20 | **M7: `lastSeen` của badge slave = max(REST /latest, mốc WS tail cuối)** — REST refresh 15 s > ngưỡng stale 10 s nên không được tính độ tươi chỉ từ /latest | M7 report §4.4 |
+| 2026-09-20 | **M8: `/history` flux đổi tail `sort desc → limit → sort asc`** — khi vượt cap giữ điểm **MỚI NHẤT** (cả raw lẫn agg), thay vì cũ nhất làm chart realtime mất đuôi (fix backlog M7 §5.1) | M8 report §2/§3, M7 report §4.1 |
+| 2026-09-20 | **M8: `GET /api/v1/events` aggregate toàn hệ thống** (join gateways, con trỏ `before`+`code`, limit clamp 500) — EventsPage dùng 1 request thay loop theo gateway (backlog M7 §5.2) | M8 report §2 |
+| 2026-09-20 | **M8: `DELETE /gateways/{id}` dọn Redis theo scan `sb:latest:{gw}:*`** — không tin mỗi bảng slaves (gateway có telemetry nhưng chưa có slave row sẽ leak key); Influx **giữ nguyên** theo Q5 | M8 report §4.1 |
 | 2026-09-19 | Parser theo adapter pattern; payload gateway loại mới phải lưu vào `docs/payloads/` trước khi viết adapter | PROJECT_PLAN.md §2, §6 |
 
 ## Câu hỏi mở còn lại
@@ -76,3 +79,4 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | **M6b ✅ redesign** theo 5 screenshot tham chiếu admin IIoT (user yêu cầu, skills design-taste-frontend + redesign-existing-projects): dark tokens (nền #0c0e12, amber #dfa24a đơn accent, mono cho số), topbar + sidebar, 5 route `/` `/events` `/diagnostics` `/gateways/:id` `/gateways/:id/slaves/:addr` — KPI row, card sparkline (seed /history + stream WS), badge per-slave, chart Recharts 15m/1h/6h/24h, Events filter severity/device/code + phân trang, Diagnostics + history từ frame. Verify lại kết nối backend qua nginx: đủ 3 nhịp badge online→stale→offline→online trên UI mới không reload, filter 36→23 dòng, không leak WS (socket dùng chung). Fix phát sinh: auto-refresh REST 5 s cho GatewayDetail (badge per-slave kẹt stale), `.badge` nowrap. Phạm vi M7 cover phần lớn — chốt phần còn lại trước khi bắt đầu |
 | 2026-09-19 | **Tài liệu hạ tầng** — [INFRA-ports-va-tai-khoan.md](INFRA-ports-va-tai-khoan.md): bảng cổng (public + nội bộ docker network), tài khoản truy cập từng hệ thống (không ghi secrets — trỏ biến trong `.env`), việc mở cho production (bind 127.0.0.1, MQTT ACL, Redis password, AUTH_ENABLED) |
 | 2026-09-20 | **M7 ✅** — drill-down slave realtime: `subscribeTelemetry` pub-sub trong LiveContext, SlaveDetailPage viết lại (4 khoảng thời gian, pills signal, trục hợp nhất + gap null, WS tail 250 ms), Events phân trang sâu bằng con trỏ `before`, cột seq gap 1h ước lượng (R1) ở Chẩn đoán, trang 404. DoD live: ai_raw 1h 0,105 s/3066 điểm khớp influx CLI 3136 (lệch mép cửa sổ), events 81=81 khớp psql, gap hc0 đứt đoạn không crash (6119 điểm · 4125 mốc trống), 404/503 influx error-box không white-screen. **Phát hiện: `/history` raw flux `sort asc + limit` giữ điểm CŨ NHẤT — sim 100 ms đã chạm cap 5000 (5.031 điểm/h); workaround frontend `limit=20000`, fix gốc backend vào backlog M8.** 2 fix UI: badge trễ giả (lastSeen=max REST,WS), truncation. Build TS strict sạch |
+| 2026-09-20 | **M8 ✅ — hoàn thành 9/9 milestone phase 1.** Admin UI `/admin` (GatewaysAdminPage): CRUD gateway không đụng SQL — POST validate id/adapter (400/409/422), PATCH inline display_name + enable/disable, DELETE confirm (PG cascade + Redis scan `sb:latest:{gw}:*`, Influx giữ theo Q5), panel "chưa đăng ký" từ `pipeline._unknown_seen` + quick-add, GW_S7200_02 (simulator instance 2) lên dashboard badge online; E2E qua UI đủ mọi mục DoD gồm 409 thân thiện không white-screen. **Gộp backlog được duyệt:** fix `/history` tail `sort desc→limit→sort asc` (vượt cap giữ điểm MỚI NHẤT — verify last=05:29:55 sát mép stop) + `GET /api/v1/events` aggregate (EventsPage còn 1 request, cursor `next_before` toàn cục). Phát hiện E2E: leak latest-key của slave chưa có row → sửa scan. 83 test backend (+14 M8), ruff/black/eslint/prettier/build sạch. Còn lại: backlog sau M8 (auth JWT thật là chính) + Q2b/Q7 mở |

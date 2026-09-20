@@ -1,4 +1,11 @@
-import { Activity, CalendarClock, LayoutDashboard, Radar, type LucideIcon } from "lucide-react";
+import {
+  Activity,
+  CalendarClock,
+  LayoutDashboard,
+  Radar,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { useLive } from "../state/LiveContext";
@@ -21,6 +28,10 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { to: "/events", icon: CalendarClock, label: "Sự kiện" },
       { to: "/diagnostics", icon: Radar, label: "Chẩn đoán" },
     ],
+  },
+  {
+    section: "Quản trị",
+    items: [{ to: "/admin", icon: Settings, label: "Gateway" }],
   },
 ];
 
