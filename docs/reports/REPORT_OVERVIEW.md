@@ -6,12 +6,12 @@
 
 - **Dự án:** SignalBridge — giám sát PLC realtime
 - **Plan:** `PROJECT_PLAN.md` v1.3 (2026-09-19)
-- **Cập nhật gần nhất:** 2026-09-19 — M5 hoàn thành (WebSocket realtime + throttle latest-wins, xem [M5-websocket-realtime.md](M5-websocket-realtime.md))
+- **Cập nhật gần nhất:** 2026-09-19 — M6 hoàn thành + M6b redesign giao diện theo tham chiếu admin IIoT (5 route, xem [M6-frontend-dashboard.md](M6-frontend-dashboard.md))
 
 ## Trạng thái tổng thể
 
-**Phase hiện tại:** M5 hoàn thành — tiếp theo M6 (frontend dashboard tổng quan).
-**Tổng tiến độ:** 6/9 milestone.
+**Phase hiện tại:** M6 (+M6b redesign) hoàn thành — phạm vi M7 (chi tiết gateway/slave + chart) đã được cover phần lớn trong M6b; khi bắt đầu M7 cần chốt phạm vi còn lại với người dùng.
+**Tổng tiến độ:** 7/9 milestone.
 
 | Milestone | Phạm vi chức năng | Trạng thái | Báo cáo chi tiết |
 |---|---|---|---|
@@ -21,7 +21,7 @@
 | M3 | Persist Influx/Postgres/Redis | ✅ Done (2026-09-19) | [M3-persistence.md](M3-persistence.md) |
 | M4 | REST API đọc dữ liệu | ✅ Done (2026-09-19) | [M4-rest-api.md](M4-rest-api.md) |
 | M5 | WebSocket realtime | ✅ Done (2026-09-19) | [M5-websocket-realtime.md](M5-websocket-realtime.md) |
-| M6 | Frontend dashboard tổng quan | ⚪ Pending | — |
+| M6 | Frontend dashboard tổng quan (+ M6b redesign 5 trang theo tham chiếu admin IIoT) | ✅ Done (2026-09-19) | [M6-frontend-dashboard.md](M6-frontend-dashboard.md) |
 | M7 | Frontend chi tiết gateway/slave | ⚪ Pending | — |
 | M8 | Admin UI đăng ký & quản lý gateway (Q8) | ⚪ Pending | — |
 
@@ -41,6 +41,8 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | **Q8:** đăng ký gateway mới qua **UI admin** → thêm gateway CRUD (`POST/PATCH/DELETE /api/v1/gateways`) + milestone **M8** | PROJECT_PLAN.md §4.1, §7 |
 | 2026-09-19 | Timestamp chuẩn = server receive time, bỏ `ts` payload (luôn = 0) | ràng buộc #1 |
 | 2026-09-19 | **WS telemetry throttle = aggregate latest-wins + trailing flush đúng boundary** (không phải gate-drop — gate-drop bị quantize theo input: 100 ms input + 250 ms gate → 300 ms thực tế, fail DoD ±10%) | M5 report §4, PROJECT_PLAN §4.2 |
+| 2026-09-19 | **Badge M6 tính phía client bằng tick 1 s** (`badgeOf = broker state × độ tươi telemetry`) — server không gửi frame mỗi giây nên transition online→stale phải do UI tự recompute; đạt "≤ ngưỡng + 1 nhịp UI" | M6 report §4, ràng buộc #5 |
+| 2026-09-19 | **M6b: một socket WS dùng chung mọi route** (LiveProvider bọc BrowserRouter, không phải per-page) — tránh N socket khi điều hướng SPA; verify `ws_clients` ổn định qua 5 reload | M6 report §2/§3 |
 | 2026-09-19 | Parser theo adapter pattern; payload gateway loại mới phải lưu vào `docs/payloads/` trước khi viết adapter | PROJECT_PLAN.md §2, §6 |
 
 ## Câu hỏi mở còn lại
@@ -68,3 +70,6 @@ Ký hiệu: ⚪ Pending · 🔵 In progress · 🟡 Blocked · ✅ Done
 | 2026-09-19 | **M3 ✅** — influx_writer batch 1 s (telemetry+diag, sparse, server-time), redis writer 3 key §3.3, pg writer (info upsert, events, STATUS dedupe qua Redis). DoD đủ 5 mục trên stack thật: 10 điểm/s steady ±0%, kill -9 backend → retain replay 0 event trùng, mỗi kill/restart đúng 2 dòng STATUS. Bug sửa: `Point.add_field`→`field`; `:raw::jsonb`→`CAST(:raw AS jsonb)`. 28 unit test |
 | 2026-09-19 | **M4 ✅** — 7 endpoint đọc (§4.1) + error contract + badge 3 trạng thái. DoD live: stale khi telemetry dừng (MQTT vẫn online), offline < 5 s sau LWT, health 503 khi redis chết, coverage API 98%, 49 test. Bug: Influx 2.7 không có `typeof()` → agg tách 2 flux numeric/DI merge Python; sửa M3 sót meta info (fw/hw/ip/mac) trong upsert. POST/DELETE gateways hoãn sang M8 |
 | 2026-09-19 | **M5 ✅** — WS hub + subscribe §4.2, snapshot 5 ms, đủ 5 kind frame (info sau upsert, diag/event ngay), heartbeat uvicorn ping 30 s, Broadcaster Local/RedisPubSub (env `WS_PUBSUB_ENABLED`), stats `ws_clients/published/dropped`. DoD live: 41 frame/10 s nhịp đúng 250 ms (+2,5%), status offline tới client 3,0 s sau kill -9, reconnect sau restart backend, CPU không tăng quá noise. **Quyết định kỹ thuật: throttle = latest-wins + trailing flush boundary** (gate-drop thuần bị quantize theo input 100 ms → 300 ms, fail ±10%). 69 test |
+| 2026-09-19 | **M6 ✅** — dashboard tổng quan: `api/client.ts` + `useGatewaySocket` (backoff 1→30 s), `StatusBadge` 3 trạng thái tooltip Việt, `GatewayCard` nhãn "(raw)" (Q2), `SummaryPage` REST nền + WS snapshot/frames đè, tick 1 s recompute badge (ràng buộc #5). DoD live qua nginx: ai_raw đổi liên tục nhịp 250 ms, stale hiển thị ngay khi status online + telemetry dừng, offline ~0,5 s sau kill -9, `ws_clients` 1→3→1 không leak, reconnect sau restart backend, build TS strict sạch, 69 test backend không đổi |
+| 2026-09-19 | **M6b ✅ redesign** theo 5 screenshot tham chiếu admin IIoT (user yêu cầu, skills design-taste-frontend + redesign-existing-projects): dark tokens (nền #0c0e12, amber #dfa24a đơn accent, mono cho số), topbar + sidebar, 5 route `/` `/events` `/diagnostics` `/gateways/:id` `/gateways/:id/slaves/:addr` — KPI row, card sparkline (seed /history + stream WS), badge per-slave, chart Recharts 15m/1h/6h/24h, Events filter severity/device/code + phân trang, Diagnostics + history từ frame. Verify lại kết nối backend qua nginx: đủ 3 nhịp badge online→stale→offline→online trên UI mới không reload, filter 36→23 dòng, không leak WS (socket dùng chung). Fix phát sinh: auto-refresh REST 5 s cho GatewayDetail (badge per-slave kẹt stale), `.badge` nowrap. Phạm vi M7 cover phần lớn — chốt phần còn lại trước khi bắt đầu |
+| 2026-09-19 | **Tài liệu hạ tầng** — [INFRA-ports-va-tai-khoan.md](INFRA-ports-va-tai-khoan.md): bảng cổng (public + nội bộ docker network), tài khoản truy cập từng hệ thống (không ghi secrets — trỏ biến trong `.env`), việc mở cho production (bind 127.0.0.1, MQTT ACL, Redis password, AUTH_ENABLED) |

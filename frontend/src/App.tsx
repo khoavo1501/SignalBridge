@@ -1,13 +1,28 @@
-import { Activity } from "lucide-react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+
+import Layout from "./components/Layout";
+import { LiveProvider } from "./state/LiveContext";
+import DashboardPage from "./pages/DashboardPage";
+import DiagnosticsPage from "./pages/DiagnosticsPage";
+import EventsPage from "./pages/EventsPage";
+import GatewayDetailPage from "./pages/GatewayDetailPage";
+import SlaveDetailPage from "./pages/SlaveDetailPage";
 
 export default function App() {
   return (
-    <main style={{ padding: 48, fontFamily: "system-ui, sans-serif" }}>
-      <h1>
-        <Activity size={28} style={{ verticalAlign: "middle", marginRight: 8 }} />
-        SignalBridge
-      </h1>
-      <p>Scaffold M0 — dashboard tổng quan sẽ có ở M6, chi tiết gateway ở M7, admin ở M8.</p>
-    </main>
+    <LiveProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/events" element={<EventsPage />} />
+            <Route path="/diagnostics" element={<DiagnosticsPage />} />
+            <Route path="/gateways/:id" element={<GatewayDetailPage />} />
+            <Route path="/gateways/:id/slaves/:addr" element={<SlaveDetailPage />} />
+            {/* M8: /admin */}
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </LiveProvider>
   );
 }

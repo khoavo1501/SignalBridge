@@ -87,3 +87,9 @@ Lỗi trả `{"error": {"code": "...", "message": "..."}}` (404 gateway_not_foun
 ## WebSocket realtime (M5)
 
 `ws://localhost/ws` (qua Nginx). Client gửi `{"type":"subscribe","gateways":["GW_S7200_01"]}` — thiếu `gateways` = nhận hết. Server trả envelope `{"type","ts","data"}` với kind: `snapshot` (frame đầu khi connect — summary §4.1), `telemetry` (throttle latest-wins `WS_TELEMETRY_MIN_INTERVAL_MS=250`), `status`/`event`/`info`/`diag` (gửi ngay). Heartbeat: uvicorn protocol ping 30 s. Nhiều instance backend: bật `WS_PUBSUB_ENABLED=true` (fan-out Redis Pub/Sub kênh `sb:ws`). Đo nhanh: `cd backend && python tests/e2e_ws.py rate|wait|hold --url ws://localhost:8000/ws` (cần `pip install websockets`).
+
+## Dashboard (M6 + M6b redesign)
+
+Giao diện dark theo tham chiếu admin IIoT: topbar (chip live WS) + sidebar, 5 route — `/` (KPI + card gateway có sparkline), `/gateways/:id` (breadcrumb, meta fw/hw/ip/mac, bảng PLC badge per-slave, panel cảnh báo), `/gateways/:id/slaves/:addr` (chart Recharts tầm nhìn 15m/1h/6h/24h qua `/history`), `/events` (lọc severity/device/code + phân trang), `/diagnostics` (bảng `/diag` + lịch sử diag từ frame WS).
+
+Nguồn dữ liệu: REST seed lúc tải trang, sau đó **một socket WS dùng chung mọi route** (`LiveProvider`) cập nhật realtime — snapshot + telemetry throttle 250 ms + status/event/info/diag; tự reconnect backoff 1→30 s. Badge mỗi gateway tính phía client mỗi giây (broker state × độ tươi telemetry, ngưỡng `STALE_THRESHOLD_S=10`); giá trị analog hiển thị raw + nhãn "(raw)" chờ Q2b. Trang GatewayDetail/SlaveDetail có auto-refresh REST (5 s / 15 s). Dev mode: `cd frontend && npm run dev` → `http://localhost:5173` (vite proxy sẵn `/api` và `/ws` sang `:8000`).
