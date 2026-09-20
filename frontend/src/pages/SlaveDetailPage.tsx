@@ -17,18 +17,20 @@ import StatusBadge from "../components/StatusBadge";
 import { useLive } from "../state/LiveContext";
 import { fmtAgo, fmtNum } from "../state/format";
 
+// cách 1 chống lag: mọi cửa sổ đều agg phía backend (raw 1h = ~10k điểm SVG → giật)
 const RANGES = [
-  { label: "15m", s: 900, agg: "raw" },
-  { label: "1h", s: 3600, agg: "raw" },
-  { label: "6h", s: 21600, agg: "10s" },
-  { label: "24h", s: 86400, agg: "1m" },
+  { label: "15m", s: 900, agg: "2s", aggMs: 2_000 },
+  { label: "1h", s: 3_600, agg: "5s", aggMs: 5_000 },
+  { label: "6h", s: 21_600, agg: "10s", aggMs: 10_000 },
+  { label: "24h", s: 86_400, agg: "1m", aggMs: 60_000 },
 ];
 
 const ICONS = [Thermometer, Gauge, Zap];
-const TAIL_CAP = 1200; // điểm WS giữ thêm giữa hai lần REST refresh (15 s ≈ 150 điểm @10 Hz)
+const TAIL_CAP = 2400; // trần ô cửa sổ trượt (6h/10s = 2160)
 
 interface TailPoint {
-  t: number;
+  t: number; // mốc đã bucket theo ô agg — khớp lưới cửa sổ trượt
+  raw: number; // tsMs thật của tick cuối trong ô — giữ độ tươi chính xác cho badge
   values: Record<string, number>;
 }
 
@@ -70,7 +72,6 @@ export default function SlaveDetailPage() {
         `/gateways/${id}/history?slave=${slaveAddr}&signals=${(keys.length ? keys : ["ai_raw"]).join(",")}&agg=${RANGES[rangeIx].agg}&from=${from}&limit=20000`,
       );
       setHist(h);
-      setTail([]); // REST vừa phủ tới hiện tại — nối lại WS tail từ 0
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
@@ -82,7 +83,9 @@ export default function SlaveDetailPage() {
     return () => window.clearInterval(t);
   }, [load]);
 
-  // M7 DoD: "WS cập nhật chart đang hiển thị" — nối telemetry frame cùng gateway+slave vào đuôi chart
+  const interval = RANGES[rangeIx].aggMs;
+
+  // M7 DoD: "WS cập nhật chart đang hiển thị" — telemetry frame nối vào đuôi chart, latest-wins trong ô agg hiện tại
   useEffect(
     () =>
       subscribeTelemetry((tick) => {
@@ -93,35 +96,72 @@ export default function SlaveDetailPage() {
           if (typeof v === "number" && (keys.length === 0 || keys.includes(k))) values[k] = v;
         }
         if (!Object.keys(values).length) return;
-        setTail((prev) => [...prev, { t: tick.tsMs, values }].slice(-TAIL_CAP));
+        const bucket = Math.floor(tick.tsMs / interval) * interval;
+        setTail((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.t > bucket) return prev; // tick muộn hơn tới trước — bỏ
+          if (last && last.t === bucket)
+            return [...prev.slice(0, -1), { t: bucket, raw: tick.tsMs, values }];
+          return [...prev, { t: bucket, raw: tick.tsMs, values }].slice(-TAIL_CAP);
+        });
       }),
-    [subscribeTelemetry, id, slaveAddr, universe],
+    [subscribeTelemetry, id, slaveAddr, universe, interval],
   );
 
-  // Trục thời gian hợp nhất: mọi mốc của mọi series + tail — signal vắng tại mốc nào → null → Line đứt đoạn (gap hc0/c0)
-  const rows = useMemo<ChartRow[]>(() => {
-    const byT = new Map<number, Record<string, number | null>>();
+  // Cửa sổ trượt: lưới thời gian cố định [start, anchor] — anchor nhảy đúng 1 lần mỗi ô agg (không mỗi giây)
+  const anchor = Math.floor(nowMs / interval) * interval;
+  const nSlots = Math.min(Math.floor((RANGES[rangeIx].s * 1000) / interval), TAIL_CAP);
+  const gridStart = anchor - (nSlots - 1) * interval;
+
+  // Signal đã có data: các ô trước điểm đầu = 0 (user yêu cầu); gap giữa chừng vẫn null để đứt đoạn (hc0)
+  const { rows, counts, nulls } = useMemo(() => {
+    const byT = new Map<number, Record<string, number>>();
     for (const s of hist?.series ?? []) {
       for (const p of s.points) {
-        const t = Date.parse(p.t);
+        const t = Math.floor(Date.parse(p.t) / interval) * interval;
+        if (t < gridStart || t > anchor) continue;
         const row = byT.get(t) ?? {};
         row[s.signal] = p.v;
         byT.set(t, row);
       }
     }
     for (const tp of tail) {
+      if (tp.t < gridStart || tp.t > anchor) continue;
       const row = byT.get(tp.t) ?? {};
       for (const [k, v] of Object.entries(tp.values)) row[k] = v;
       byT.set(tp.t, row);
     }
-    return [...byT.entries()].sort((a, b) => a[0] - b[0]).map(([t, vals]) => ({ t, ...vals }));
-  }, [hist, tail]);
+    const firstT = new Map<string, number>();
+    const cnt = new Map<string, number>();
+    for (const [t, vals] of byT) {
+      for (const [k, v] of Object.entries(vals)) {
+        if (!Number.isFinite(v)) continue;
+        cnt.set(k, (cnt.get(k) ?? 0) + 1);
+        const cur = firstT.get(k);
+        if (cur === undefined || t < cur) firstT.set(k, t);
+      }
+    }
+    const grid: ChartRow[] = [];
+    const nulls = new Map<string, number>();
+    for (let i = 0; i < nSlots; i++) {
+      const t = gridStart + i * interval;
+      const vals = byT.get(t);
+      const row: ChartRow = { t };
+      for (const [sig, fb] of firstT) {
+        const v = vals?.[sig];
+        if (v == null && t >= fb) nulls.set(sig, (nulls.get(sig) ?? 0) + 1);
+        row[sig] = v ?? (t < fb ? 0 : null);
+      }
+      grid.push(row);
+    }
+    return { rows: grid, counts: cnt, nulls };
+  }, [hist, tail, interval, anchor, gridStart, nSlots]);
 
   const shownSignals = useMemo(() => {
     const fromHist = (hist?.series ?? []).filter((s) => s.points.length > 0).map((s) => s.signal);
     const fromTail = new Set(tail.flatMap((tp) => Object.keys(tp.values)));
-    return [...new Set([...fromHist, ...fromTail])];
-  }, [hist, tail]);
+    return [...new Set([...(selKeys ?? universe), ...fromHist, ...fromTail])];
+  }, [hist, tail, selKeys, universe]);
 
   const liveValue = useCallback(
     (signal: string): number | null => {
@@ -139,7 +179,7 @@ export default function SlaveDetailPage() {
   // lastSeen = max(Redis /latest, mốc tail WS gần nhất) — badge không nhấp "trễ" giữa hai lần REST 15 s khi WS vẫn streaming
   const lastSeenMs = Math.max(
     latest?.received_at ? Date.parse(latest.received_at) : 0,
-    tail.length ? tail[tail.length - 1].t : 0,
+    tail.length ? tail[tail.length - 1].raw : 0,
   );
   const slaveFresh = lastSeenMs > 0 && nowMs - lastSeenMs < 10_000;
   const shownBadge = gwBadge === "offline" ? "offline" : slaveFresh ? "online" : "stale";
@@ -234,7 +274,8 @@ export default function SlaveDetailPage() {
       <div className="chart-grid">
         {shownSignals.map((signal, i) => {
           const Icon = ICONS[i % ICONS.length];
-          const nPoints = rows.filter((r) => r[signal] != null).length;
+          const nPoints = counts.get(signal) ?? 0;
+          const nGaps = nulls.get(signal) ?? 0;
           return (
             <div key={signal} className="chart-card">
               <div className="chart-head">
@@ -249,7 +290,7 @@ export default function SlaveDetailPage() {
               </div>
               <p className="chart-sub">
                 {nPoints} điểm · {RANGES[rangeIx].label}
-                {nPoints < rows.length ? ` · ${rows.length - nPoints} mốc trống (gap)` : ""}
+                {nGaps ? ` · ${nGaps} mốc đứt gãy` : ""}
               </p>
               {nPoints >= 2 ? (
                 <ResponsiveContainer width="100%" height={220}>
@@ -259,7 +300,8 @@ export default function SlaveDetailPage() {
                       dataKey="t"
                       type="number"
                       scale="time"
-                      domain={["dataMin", "dataMax"]}
+                      domain={[gridStart, anchor]}
+                      allowDataOverflow
                       tickFormatter={(t: number) =>
                         new Date(t).toLocaleTimeString("vi-VN", {
                           hour: "2-digit",

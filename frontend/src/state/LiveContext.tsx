@@ -86,16 +86,16 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         for (const g of s.gateways) {
           const key = g.primary_metrics[0]?.key;
           if (!key) continue;
-          const from = new Date(Date.now() - 180_000).toISOString();
+          const from = new Date(Date.now() - SPARK_CAP * 2000).toISOString();
           apiGet<{ series: { points: { v: number }[] }[] }>(
-            `/gateways/${g.gateway_id}/history?slave=1&signals=${key}&agg=10s&from=${from}`,
+            `/gateways/${g.gateway_id}/history?slave=1&signals=${key}&agg=2s&from=${from}`,
           )
-            .then((h) =>
-              setSparks((p) => ({
-                ...p,
-                [g.gateway_id]: h.series[0]?.points.map((pt) => pt.v).slice(-SPARK_CAP) ?? [],
-              })),
-            )
+            .then((h) => {
+              // seed đủ chiều rộng + đệm 0 bên trái — sparkline chạy như cửa sổ trượt, không "gõ lại" từ trái qua
+              const vals = h.series[0]?.points.map((pt) => pt.v).slice(-SPARK_CAP) ?? [];
+              const pad = new Array<number>(Math.max(0, SPARK_CAP - vals.length)).fill(0);
+              setSparks((p) => ({ ...p, [g.gateway_id]: [...pad, ...vals] }));
+            })
             .catch(() => {
               /* influx trống — sparkline đầy dần qua WS */
             });
