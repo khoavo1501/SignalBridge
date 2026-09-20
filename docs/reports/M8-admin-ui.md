@@ -2,7 +2,7 @@
 
 - **Ngày hoàn thành:** 2026-09-20
 - **Trạng thái:** ✅ Done
-- **Commit/PR:** `feat: M8 ...` (hash ghi ở commit docs tiếp theo theo thông lệ M4–M7)
+- **Commit/PR:** `55bd64d — feat: M8 admin UI`
 
 ## 1. Mục tiêu (chiếu PROJECT_PLAN.md §7)
 
