@@ -67,6 +67,8 @@ services:
 
   backend:
     build: ./backend
+    # CD đẩy ảnh lên registry (IMAGE_REPO=ghcr.io/<owner>/signalbridge); dev local giữ nguyên build
+    image: ${IMAGE_REPO:-signalbridge}-backend:${IMAGE_TAG:-latest}
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-signalbridge}
@@ -94,6 +96,7 @@ services:
 
   frontend:
     build: ./frontend
+    image: ${IMAGE_REPO:-signalbridge}-frontend:${IMAGE_TAG:-latest}
     depends_on:
       backend:
         condition: service_started

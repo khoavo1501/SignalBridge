@@ -120,9 +120,38 @@ docker compose build frontend && docker compose up -d frontend
 - [ ]EMQX: tắt anonymous, bật auth + ACL theo topic `devices/{gw}/{slave}`; đổi mật `admin` dashboard.
 - [ ]Redis: đặt password (`requirepass`) + cập nhật `REDIS_URL`.
 - [ ]HTTPS + auth: `AUTH_ENABLED=true` (JWT stub đã định vị chỗ gắn — plan §4.5), đổi secret `INFLUX_TOKEN` qua UI Influx và khởi tạo lại volume nếu token demo đã lộ.
-- [ ]CI: repo **chưa có git remote** — workflow `.github/workflows/ci.yml` chỉ chạy thật sau khi push.
+- [x]CI: repo có remote `https://github.com/khoavo1501/SignalBridge.git` — **toàn bộ commit đã push (2026-09-21)**, GitHub Actions `ci.yml` đã chạy xanh trên `main`; CD xem §10.
 
-## 8. Sự cố đã gặp & cách xử lý (troubleshooting)
+## 8. Deploy lên AWS free tier (hướng hiện hành, chốt 2026-09-21)
+
+**Bối cảnh:** gateway ở xa, không cùng LAN 192.168.1.x → broker phải có public IP. Q1 được chốt lại: **firmware trỏ về Elastic IP AWS :1883** (không phải `192.168.1.3` nữa — mục §0 chỉ đúng cho môi trường dev/test local).
+
+**Chính sách free tier mới (tài khoản tạo sau 15/07/2025):** $100 credit + tối đa +$100 khi hoàn thành activity, hạn **6 tháng rồi auto-close**. Nhãn "Free tier eligible" trong Console EC2 nghĩa là **trừ vào credit**, không phải miễn phí theo hạn mức tháng. Ước tính chạy 24/7 đủ 7 service: compute ~$15,2 + IPv4 ~$3,7 + EBS ~$1,6 ≈ **$20/tháng → ~$123/6 tháng**, cần cày đủ credit cộng thêm hoặc chấp nhận chi phần vượt. Hết tháng 6: snapshot EBS rồi export/trước khi account đóng.
+
+**Shape đã chọn: `t3.small`** (2 vCPU / 2 GiB, $0.0208/h Linux). Lý do loại các mức khác: micro 1 GB không đủ 7 service (EMQX 400–600 MB + Influx 250–400 MB); c7i/m7i-flex.large vét credit trong ~1,5 tháng; t8i.small đắt hơn mà không lợi thế.
+
+**Điều kiện để 2 GB chạy ổn (bắt đủ, không phải tùy chọn):**
+1. **Swap 2 GB** trước khi chạy stack:
+   ```bash
+   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile \
+     && sudo mkswap /swapfile && sudo swapon /swapfile \
+     && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   ```
+2. Log rotation **trước** `docker compose up` — `/etc/docker/daemon.json`:
+   `{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}`
+3. `docker-compose.override.yml` trên VM: `mem_limit` từng service (emqx 600m, influxdb 500m, postgres 300m, backend 400m, redis 100m, frontend/nginx 64m), `restart: unless-stopped`, **bỏ publish** 5432/6379/8086/8000/18083 (chỉ giữ 80 + 1883).
+4. Build image ngay trên VM được (đủ swap) nhưng chậm; nếu OOM thì build từng service một: `docker compose build backend` rồi `... frontend`.
+
+**Các bước còn lại:**
+1. ~~Push commit lên GitHub~~ — **đã xong 2026-09-21**: `origin/main` khớp local, CI xanh.
+2. Launch: Ubuntu 24.04 LTS, `t3.small`, 20 GB gp3, **key pair tạo mới — tải private key về ngay** (bài học mất key lần trước), region gần gateway nhất.
+3. Security group chỉ mở `22` (theo IP nhà bạn), `80`, `1883`. Gán **Elastic IP** assoc vào instance.
+4. `curl -fsSL https://get.docker.com | sudo sh`; làm theo §1 (tạo `.env`, **đổi toàn bộ `change-me*`** — máy public thật sự).
+5. EMQX: firmware STM32+W5500 **không gửi user/pass** → không thể bắt buộc auth ở phía gateway; giảm thiểu bằng ACL chỉ cho publish `devices/{gw_id}/{slave}` + tắt dashboard 18083 công khai (đã bỏ publish ở bước 3, vào bằng SSH tunnel).
+6. `docker compose up -d --build` → chạy checklist §6.
+7. Cấu hình firmware: broker = Elastic IP, port 1883, keepalive ≤ 30 s.
+
+## 9. Sự cố đã gặp & cách xử lý (troubleshooting)
 
 | Triệu chứng | Nguyên nhân | Cách xử lý |
 |---|---|---|
@@ -133,3 +162,24 @@ docker compose build frontend && docker compose up -d frontend
 | Redis key `sb:latest:*` còn sót sau DELETE gateway | client của slave chưa từng có row trong PG | đã fix M8: xóa theo `scan_iter("sb:latest:{gw}:*")` |
 | Badge "trễ" nhấp nháy trên trang slave | REST refresh 15 s > ngưỡng 10 s | đã fix M7: `lastSeen = max(REST /latest, mốc WS cuối)` |
 | Firmware không vào được broker | máy deploy đổi IP | EMQX bàn giao tại `192.168.1.3:1883` (Q1) — giữ IP hoặc đổi cấu hình firmware |
+
+## 10. CI/CD (GitHub Actions)
+
+**CI** — `.github/workflows/ci.yml`, đang xanh trên `main`:
+
+| Job | Nội dung |
+|---|---|
+| `infra-validate` | `docker compose config -q` — chặn lỗi schema compose |
+| `backend` | ruff + black (app, tests) + `pytest -q`, Python 3.12 |
+| `frontend` | eslint + prettier `--check` + `tsc -b && vite build`, Node 22 |
+| `docker-build` | build smoke 2 image backend/frontend (không push) |
+
+Trigger: push `main`, PR, `workflow_dispatch`; `concurrency` tự hủy run cũ cùng ref.
+
+**CD** — `.github/workflows/deploy.yml`. Mặc định **tắt**; build ảnh trên runner GitHub (nhanh, miễn phí) → push **GHCR** `ghcr.io/<owner>/signalbridge-{backend,frontend}:<sha>` → SSH vào server: `git pull --ff-only` + `IMAGE_REPO/IMAGE_TAG=<sha> docker compose pull backend frontend && up -d` → `curl /api/v1/health` chặn cuối. VM 2 GB **không phải build** tại chỗ (thay thế bước 4 §8 khi đã bật CD). Rollback: chạy lại `workflow_dispatch` ở commit cũ hoặc `git revert`.
+
+Kích hoạt một lần:
+
+1. Server đã setup theo §8 (clone repo + `.env` + `up -d` lần đầu; thêm `IMAGE_REPO`/`IMAGE_TAG` vào `.env` của server).
+2. GitHub → Settings → Secrets and variables → Actions — **secrets**: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (private key), `DEPLOY_PATH` (thư mục repo trên server); nếu package GHCR để **private**: thêm `GHCR_USER` + `GHCR_PAT` (scope `read:packages`), hoặc set 2 image public và bỏ login.
+3. **Repository variable** `DEPLOY_ENABLED = true` → deploy chạy theo push `main` chạm `backend/** frontend/** docker-compose.yml deploy/**`, hoặc bấm Run workflow thủ công.

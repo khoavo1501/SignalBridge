@@ -1,0 +1,82 @@
+name: Deploy
+
+# CD: build ảnh Docker trên runner → đẩy GHCR → SSH vào server pull đúng sha và recreate.
+# Chưa có server thì pipeline im lặng: tạo repo variable DEPLOY_ENABLED=true sau khi khai báo secrets (xem docs/reports/HUONG-DAN-SETUP-VA-DEPLOY.md §10).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "docker-compose.yml"
+      - "deploy/**"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  images:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hạ slug về chữ thường (GHCR bắt buộc)
+        id: slug
+        run: echo "value=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.slug.outputs.value }}-${{ matrix.service }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.slug.outputs.value }}-${{ matrix.service }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy qua SSH — pull ảnh theo sha, recreate 2 service, giữ volumes
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          SLUG: ${{ github.repository_owner }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: GITHUB_SHA,SLUG,DEPLOY_PATH,GHCR_USER,GHCR_PAT
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+            git pull --ff-only origin main
+            repo="ghcr.io/$(echo "$SLUG" | tr '[:upper:]' '[:lower:]')/signalbridge"
+            if [ -n "$GHCR_PAT" ]; then
+              echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            fi
+            export IMAGE_REPO="$repo" IMAGE_TAG="$GITHUB_SHA"
+            docker compose pull backend frontend
+            docker compose up -d
+            docker image prune -f
+            sleep 8
+            curl -fsS http://localhost/api/v1/health
