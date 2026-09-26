@@ -28,4 +28,6 @@ deploy/local-data/
 coverage
 .coverage
 htmlcov/
-HUONG-DAN-SETUP-VA-DEPLOY.md
+# bao cao / tai lieu chi tiet — chi giu bao cao chinh trong repo
+docs/reports/*
+!docs/reports/REPORT_OVERVIEW.md
