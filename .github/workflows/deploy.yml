@@ -60,6 +60,9 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
           SLUG: ${{ github.repository_owner }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
